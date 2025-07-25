@@ -18,15 +18,13 @@ export function createGetUser(authKitInstance: any) {
  */
 export function createGetSignInUrl(authKitInstance: any) {
   return (options?: SignInOptions) => {
-    const state = options?.returnTo
-      ? btoa(JSON.stringify({ returnPathname: options.returnTo }))
-      : undefined;
+    const state = options?.returnTo ? btoa(JSON.stringify({ returnPathname: options.returnTo })) : undefined;
 
     return authKitInstance.getSignInUrl({
       redirectUri: process.env.WORKOS_REDIRECT_URI,
       organizationId: options?.organizationId,
       loginHint: options?.loginHint,
-      state
+      state,
     });
   };
 }
@@ -36,15 +34,13 @@ export function createGetSignInUrl(authKitInstance: any) {
  */
 export function createGetSignUpUrl(authKitInstance: any) {
   return (options?: SignInOptions) => {
-    const state = options?.returnTo
-      ? btoa(JSON.stringify({ returnPathname: options.returnTo }))
-      : undefined;
+    const state = options?.returnTo ? btoa(JSON.stringify({ returnPathname: options.returnTo })) : undefined;
 
     return authKitInstance.getSignUpUrl({
       redirectUri: process.env.WORKOS_REDIRECT_URI,
       organizationId: options?.organizationId,
       loginHint: options?.loginHint,
-      state
+      state,
     });
   };
 }
@@ -58,8 +54,8 @@ export function createSignOut(authKitInstance: any) {
     const response = new Response(null, {
       status: 302,
       headers: {
-        Location: '/'
-      }
+        Location: '/',
+      },
     });
 
     // Clear session cookie
@@ -74,17 +70,13 @@ export function createSignOut(authKitInstance: any) {
 export function createSwitchOrganization(authKitInstance: any) {
   return async (event: RequestEvent, { organizationId }: { organizationId: string }) => {
     const auth = event.locals.auth as AuthKitAuth;
-    
+
     if (!auth?.user) {
       throw new Error('User must be authenticated to switch organizations');
     }
 
     // Use the authkit-session switchToOrganization method
-    const response = await authKitInstance.switchToOrganization(
-      event.request,
-      new Response(),
-      { organizationId }
-    );
+    const response = await authKitInstance.switchToOrganization(event.request, new Response(), { organizationId });
 
     // Redirect to refresh the page with new organization context
     throw redirect(302, event.url.pathname);
@@ -116,7 +108,7 @@ export function createHandleCallback(authKitInstance: any) {
         const workos = getWorkOS();
         const authResponse = await workos.userManagement.authenticateWithCode({
           code,
-          clientId: getConfig('clientId')
+          clientId: getConfig('clientId'),
         });
 
         // Decode state to get return path
@@ -134,8 +126,8 @@ export function createHandleCallback(authKitInstance: any) {
         let response = new Response(null, {
           status: 302,
           headers: {
-            Location: returnPath
-          }
+            Location: returnPath,
+          },
         });
 
         // Save the session
@@ -143,7 +135,7 @@ export function createHandleCallback(authKitInstance: any) {
           accessToken: authResponse.accessToken,
           refreshToken: authResponse.refreshToken,
           user: authResponse.user,
-          impersonator: authResponse.impersonator
+          impersonator: authResponse.impersonator,
         };
 
         // Use authkit-session to save the session
@@ -163,11 +155,8 @@ export function createHandleCallback(authKitInstance: any) {
  */
 export function createRefreshSession(authKitInstance: any) {
   return async (event: RequestEvent) => {
-    const response = await authKitInstance.refreshSession(
-      event.request,
-      new Response()
-    );
-    
+    const response = await authKitInstance.refreshSession(event.request, new Response());
+
     // Return whether refresh was successful
     return response.status === 200;
   };

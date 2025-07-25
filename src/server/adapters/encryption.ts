@@ -15,17 +15,17 @@ export class SvelteKitSessionEncryption implements SessionEncryption {
       saltBits: 256,
       algorithm: 'aes-256-cbc' as const,
       iterations: 1,
-      minPasswordlength: 32
+      minPasswordlength: 32,
     },
     integrity: {
       saltBits: 256,
       algorithm: 'sha256' as const,
       iterations: 1,
-      minPasswordlength: 32
+      minPasswordlength: 32,
     },
     ttl: 0,
     timestampSkewSec: 60,
-    localtimeOffsetMsec: 0
+    localtimeOffsetMsec: 0,
   };
 
   /**
@@ -50,13 +50,13 @@ export class SvelteKitSessionEncryption implements SessionEncryption {
     // Format password as iron-session expects
     const passwordObj = {
       id: '1',
-      secret: password
+      secret: password,
     };
 
     // Seal the data
     const seal = await sealData(globalThis.crypto, data, passwordObj, {
       ...this.ironOptions,
-      ttl: ttl * 1000 // Convert seconds to milliseconds
+      ttl: ttl * 1000, // Convert seconds to milliseconds
     });
 
     // Add version delimiter
@@ -95,3 +95,4 @@ export class SvelteKitSessionEncryption implements SessionEncryption {
     return data as T;
   }
 }
+

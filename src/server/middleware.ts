@@ -7,9 +7,7 @@ import type { AuthenticatedHandler, AuthKitAuth } from '../types.js';
  * Ensures the user is authenticated before running the handler
  */
 export function createWithAuth(authKitInstance: any) {
-  return function withAuth<T>(
-    handler: AuthenticatedHandler<T>
-  ): (event: RequestEvent) => Promise<T> {
+  return function withAuth<T>(handler: AuthenticatedHandler<T>): (event: RequestEvent) => Promise<T> {
     return async (event: RequestEvent) => {
       // Get auth from locals (populated by the handle hook)
       const auth = event.locals.auth as AuthKitAuth;
@@ -19,7 +17,7 @@ export function createWithAuth(authKitInstance: any) {
         // Get the sign-in URL
         const signInUrl = authKitInstance.getSignInUrl({
           redirectUri: process.env.WORKOS_REDIRECT_URI,
-          state: btoa(JSON.stringify({ returnPathname: event.url.pathname }))
+          state: btoa(JSON.stringify({ returnPathname: event.url.pathname })),
         });
 
         // Redirect to sign-in
@@ -29,7 +27,7 @@ export function createWithAuth(authKitInstance: any) {
       // User is authenticated, call the handler with auth context
       return handler({
         ...event,
-        auth: auth as Required<AuthKitAuth>
+        auth: auth as Required<AuthKitAuth>,
       });
     };
   };
