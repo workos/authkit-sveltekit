@@ -9,9 +9,14 @@ export function createAuthKitHandle(
   authKitInstance: any
 ): (options?: AuthKitHandleOptions) => Handle {
   return (options?: AuthKitHandleOptions) => {
-    const { debug = false, onError } = options || {};
+    const { debug = false, onError, config } = options || {};
 
     return async ({ event, resolve }) => {
+      // If config is provided, reconfigure the instance
+      if (config) {
+        const { configureAuthKit } = await import('./index.js');
+        configureAuthKit(config);
+      }
       try {
         // Log debug info
         if (debug) {
@@ -38,24 +43,8 @@ export function createAuthKitHandle(
 
         // Continue with the request
         const response = await resolve(event);
-
-        // Handle session refresh if needed
-        if (authResult.refreshToken && authResult.accessToken) {
-          // Session was refreshed, save the new session
-          return await authKitInstance.saveSession(
-            response,
-            await authKitInstance.sealData(
-              {
-                accessToken: authResult.accessToken,
-                refreshToken: authResult.refreshToken,
-                user: authResult.user,
-                impersonator: authResult.impersonator
-              },
-              { password: process.env.WORKOS_COOKIE_PASSWORD! }
-            )
-          );
-        }
-
+        
+        // The authkit-session library handles session refresh internally
         return response;
       } catch (error) {
         if (debug) {

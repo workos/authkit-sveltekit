@@ -23,6 +23,7 @@ export interface AuthKitAuth {
 export interface AuthKitHandleOptions {
   debug?: boolean;
   onError?: (error: Error) => void;
+  config?: AuthKitConfig;
 }
 
 export interface SignInOptions {

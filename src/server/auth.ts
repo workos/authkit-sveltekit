@@ -1,7 +1,6 @@
 import type { RequestEvent } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import type { SignInOptions, AuthKitAuth } from '../types.js';
-import { getWorkOS, getConfig } from '@workos/authkit-session';
 
 /**
  * Create getUser helper
@@ -17,15 +16,22 @@ export function createGetUser(authKitInstance: any) {
  * Create getSignInUrl helper
  */
 export function createGetSignInUrl(authKitInstance: any) {
-  return (options?: SignInOptions) => {
-    const state = options?.returnTo ? btoa(JSON.stringify({ returnPathname: options.returnTo })) : undefined;
-
-    return authKitInstance.getSignInUrl({
-      redirectUri: process.env.WORKOS_REDIRECT_URI,
+  return async (options?: SignInOptions) => {
+    // The authkit-session getSignInUrl returns a promise
+    const url = await authKitInstance.getSignInUrl({
       organizationId: options?.organizationId,
       loginHint: options?.loginHint,
-      state,
     });
+    
+    // If we have a returnTo, we need to update the state in the URL
+    if (options?.returnTo) {
+      const urlObj = new URL(url);
+      const state = btoa(JSON.stringify({ returnPathname: options.returnTo }));
+      urlObj.searchParams.set('state', state);
+      return urlObj.toString();
+    }
+    
+    return url;
   };
 }
 
@@ -33,15 +39,22 @@ export function createGetSignInUrl(authKitInstance: any) {
  * Create getSignUpUrl helper
  */
 export function createGetSignUpUrl(authKitInstance: any) {
-  return (options?: SignInOptions) => {
-    const state = options?.returnTo ? btoa(JSON.stringify({ returnPathname: options.returnTo })) : undefined;
-
-    return authKitInstance.getSignUpUrl({
-      redirectUri: process.env.WORKOS_REDIRECT_URI,
+  return async (options?: SignInOptions) => {
+    // The authkit-session getSignUpUrl returns a promise
+    const url = await authKitInstance.getSignUpUrl({
       organizationId: options?.organizationId,
       loginHint: options?.loginHint,
-      state,
     });
+    
+    // If we have a returnTo, we need to update the state in the URL
+    if (options?.returnTo) {
+      const urlObj = new URL(url);
+      const state = btoa(JSON.stringify({ returnPathname: options.returnTo }));
+      urlObj.searchParams.set('state', state);
+      return urlObj.toString();
+    }
+    
+    return url;
   };
 }
 
@@ -50,17 +63,18 @@ export function createGetSignUpUrl(authKitInstance: any) {
  */
 export function createSignOut(authKitInstance: any) {
   return async (event: RequestEvent) => {
-    // Clear the session
-    const response = new Response(null, {
-      status: 302,
-      headers: {
-        Location: '/',
-      },
-    });
+    // Use authkit-session's signOut method
+    const response = await authKitInstance.signOut(
+      event.request,
+      new Response(null, {
+        status: 302,
+        headers: {
+          Location: '/',
+        },
+      })
+    );
 
-    // Clear session cookie
-    const storage = new (await import('./adapters/storage.js')).SvelteKitStorage();
-    return storage.clearSession(response);
+    return response;
   };
 }
 
@@ -104,42 +118,25 @@ export function createHandleCallback(authKitInstance: any) {
       }
 
       try {
-        // Authenticate with WorkOS
-        const workos = getWorkOS();
-        const authResponse = await workos.userManagement.authenticateWithCode({
-          code,
-          clientId: getConfig('clientId'),
-        });
+        // Use authkit-session's handleCallback
+        const result = await authKitInstance.handleCallback(
+          new Request(url.toString()),
+          new Response(),
+          { code, state }
+        );
 
-        // Decode state to get return path
-        let returnPath = '/';
-        if (state) {
-          try {
-            const decoded = JSON.parse(atob(state));
-            returnPath = decoded.returnPathname || '/';
-          } catch {
-            // Invalid state, use default
-          }
-        }
-
-        // Create response with redirect
-        let response = new Response(null, {
+        // Create response with redirect to the return path
+        const response = new Response(null, {
           status: 302,
           headers: {
-            Location: returnPath,
+            Location: result.returnPathname,
           },
         });
 
-        // Save the session
-        const session = {
-          accessToken: authResponse.accessToken,
-          refreshToken: authResponse.refreshToken,
-          user: authResponse.user,
-          impersonator: authResponse.impersonator,
-        };
-
-        // Use authkit-session to save the session
-        response = await authKitInstance.saveSession(response, session);
+        // Copy headers from the result response (which includes the session cookie)
+        result.response.headers.forEach((value: string, key: string) => {
+          response.headers.set(key, value);
+        });
 
         return response;
       } catch (err) {

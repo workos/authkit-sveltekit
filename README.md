@@ -51,10 +51,21 @@ export {};
 ### 3. Add to `hooks.server.ts`
 
 ```typescript
-import { authKitHandle } from '@workos/authkit-sveltekit';
+import { configureAuthKit, authKitHandle } from '@workos/authkit-sveltekit';
+import { env } from '$env/dynamic/private';
+
+// Configure AuthKit with SvelteKit's environment variables
+configureAuthKit({
+  clientId: env.WORKOS_CLIENT_ID,
+  apiKey: env.WORKOS_API_KEY,
+  redirectUri: env.WORKOS_REDIRECT_URI,
+  cookiePassword: env.WORKOS_COOKIE_PASSWORD
+});
 
 export const handle = authKitHandle();
 ```
+
+> **Note**: For simpler setups where you're using `process.env`, you can skip the `configureAuthKit` call and the SDK will automatically read from `process.env`.
 
 ### 4. Create Callback Route
 
@@ -136,6 +147,58 @@ export const handle = authKitHandle({
   debug: true, // Enable debug logging
   onError: (error) => console.error('Auth error:', error)
 });
+```
+
+## Configuration Options
+
+### Environment Variables
+
+AuthKit supports multiple ways to configure environment variables in SvelteKit:
+
+#### Option 1: Using SvelteKit's `$env` (Recommended)
+
+```typescript
+// hooks.server.ts
+import { configureAuthKit, authKitHandle } from '@workos/authkit-sveltekit';
+import { env } from '$env/dynamic/private';
+
+configureAuthKit({
+  clientId: env.WORKOS_CLIENT_ID,
+  apiKey: env.WORKOS_API_KEY,
+  redirectUri: env.WORKOS_REDIRECT_URI,
+  cookiePassword: env.WORKOS_COOKIE_PASSWORD
+});
+
+export const handle = authKitHandle();
+```
+
+#### Option 2: Using Static Environment Variables
+
+```typescript
+// hooks.server.ts
+import { configureAuthKit, authKitHandle } from '@workos/authkit-sveltekit';
+import { WORKOS_CLIENT_ID, WORKOS_API_KEY, WORKOS_REDIRECT_URI, WORKOS_COOKIE_PASSWORD } from '$env/static/private';
+
+configureAuthKit({
+  clientId: WORKOS_CLIENT_ID,
+  apiKey: WORKOS_API_KEY,
+  redirectUri: WORKOS_REDIRECT_URI,
+  cookiePassword: WORKOS_COOKIE_PASSWORD
+});
+
+export const handle = authKitHandle();
+```
+
+#### Option 3: Automatic Configuration (Node.js environments)
+
+If your environment supports `process.env`, the SDK will automatically read configuration:
+
+```typescript
+// hooks.server.ts
+import { authKitHandle } from '@workos/authkit-sveltekit';
+
+// No configureAuthKit needed - reads from process.env automatically
+export const handle = authKitHandle();
 ```
 
 ## Advanced Usage

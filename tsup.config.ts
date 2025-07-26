@@ -8,5 +8,11 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   treeshake: true,
-  external: ['@workos/authkit-session', 'cookie'],
+  external: [
+    '@workos/authkit-session', 
+    '@workos-inc/node',
+    'cookie',
+    'crypto',
+    'node:crypto'
+  ],
 });
