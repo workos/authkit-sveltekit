@@ -10,11 +10,9 @@ type AuthKitInstance = ReturnType<typeof createAuthKitFactory<Request, Response>
  */
 function addReturnToState(url: string, returnTo?: string): string {
   if (!returnTo) return url;
-  
+
   const urlObj = new URL(url);
-  const state = encodeURIComponent(
-    Buffer.from(JSON.stringify({ returnPathname: returnTo })).toString('base64')
-  );
+  const state = encodeURIComponent(Buffer.from(JSON.stringify({ returnPathname: returnTo })).toString('base64'));
   urlObj.searchParams.set('state', state);
   return urlObj.toString();
 }
@@ -39,7 +37,7 @@ export function createGetSignInUrl(authKitInstance: AuthKitInstance) {
       organizationId: options?.organizationId,
       loginHint: options?.loginHint,
     });
-    
+
     return addReturnToState(url, options?.returnTo);
   };
 }
@@ -54,7 +52,7 @@ export function createGetSignUpUrl(authKitInstance: AuthKitInstance) {
       organizationId: options?.organizationId,
       loginHint: options?.loginHint,
     });
-    
+
     return addReturnToState(url, options?.returnTo);
   };
 }
@@ -72,7 +70,7 @@ export function createSignOut(authKitInstance: AuthKitInstance) {
         headers: {
           Location: '/',
         },
-      })
+      }),
     );
 
     return response;
@@ -121,11 +119,10 @@ export function createHandleCallback(authKitInstance: AuthKitInstance) {
 
       try {
         // Use authkit-session's handleCallback
-        const result = await authKitInstance.handleCallback(
-          new Request(url.toString()),
-          new Response(),
-          { code, state }
-        );
+        const result = await authKitInstance.handleCallback(new Request(url.toString()), new Response(), {
+          code,
+          state,
+        });
 
         // Create response with redirect to the return path
         const response = new Response(null, {
