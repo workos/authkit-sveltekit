@@ -6,9 +6,18 @@ import type { AuthKitConfig } from '../../types.js';
  * SvelteKit-specific session storage adapter for AuthKit
  * Implements SessionStorage interface for Web API Request/Response objects
  */
+interface CookieOptions {
+  path: string;
+  httpOnly: boolean;
+  secure: boolean;
+  sameSite: 'lax' | 'strict' | 'none';
+  maxAge: number;
+  domain?: string;
+}
+
 export class SvelteKitStorage implements SessionStorage<Request, Response> {
   private cookieName = 'wos-session';
-  private cookieOptions: any = {
+  private cookieOptions: CookieOptions = {
     path: '/',
     httpOnly: true,
     secure: true,

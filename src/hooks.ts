@@ -1,12 +1,43 @@
-import type { Handle, RequestEvent } from '@sveltejs/kit';
+import type { Handle } from '@sveltejs/kit';
 import type { AuthKitHandleOptions, AuthKitAuth } from './types.js';
+
+type AuthKitInstance = Parameters<typeof createAuthKitHandle>[0];
+
+/**
+ * Create AuthKitAuth object from authkit-session result
+ */
+function createAuthKitAuth(authResult: any): AuthKitAuth {
+  return {
+    user: authResult.user || null,
+    organization: authResult.claims?.org_id ? { id: authResult.claims.org_id } : null,
+    role: authResult.claims?.role || null,
+    permissions: authResult.claims?.permissions || [],
+    sessionId: authResult.sessionId,
+    impersonator: authResult.impersonator || null,
+    accessToken: authResult.accessToken
+  };
+}
+
+/**
+ * Create empty auth state
+ */
+function createEmptyAuth(): AuthKitAuth {
+  return {
+    user: null,
+    organization: null,
+    role: null,
+    permissions: [],
+    sessionId: undefined,
+    impersonator: null
+  };
+}
 
 /**
  * Creates a SvelteKit handle function for AuthKit
  * Automatically manages sessions and populates event.locals.auth
  */
 export function createAuthKitHandle(
-  authKitInstance: any
+  authKitInstance: AuthKitInstance
 ): (options?: AuthKitHandleOptions) => Handle {
   return (options?: AuthKitHandleOptions) => {
     const { debug = false, onError, config } = options || {};
@@ -27,15 +58,7 @@ export function createAuthKitHandle(
         const authResult = await authKitInstance.withAuth(event.request);
         
         // Populate locals with auth data
-        event.locals.auth = {
-          user: authResult.user || null,
-          organization: authResult.claims?.org_id ? { id: authResult.claims.org_id } : null,
-          role: authResult.claims?.role || null,
-          permissions: authResult.claims?.permissions || [],
-          sessionId: authResult.sessionId,
-          impersonator: authResult.impersonator || null,
-          accessToken: authResult.accessToken
-        } as AuthKitAuth;
+        event.locals.auth = createAuthKitAuth(authResult);
 
         if (debug && authResult.user) {
           console.log('[AuthKit] User authenticated:', authResult.user.email);
@@ -56,14 +79,7 @@ export function createAuthKitHandle(
         }
 
         // Set empty auth state on error
-        event.locals.auth = {
-          user: null,
-          organization: null,
-          role: null,
-          permissions: [],
-          sessionId: undefined,
-          impersonator: null
-        } as AuthKitAuth;
+        event.locals.auth = createEmptyAuth();
 
         return resolve(event);
       }

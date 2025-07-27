@@ -1,11 +1,28 @@
 import type { RequestEvent } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
+import type { createAuthKitFactory } from '@workos/authkit-session';
 import type { SignInOptions, AuthKitAuth } from '../types.js';
+
+type AuthKitInstance = ReturnType<typeof createAuthKitFactory<Request, Response>>;
+
+/**
+ * Helper to add returnTo path to OAuth state parameter
+ */
+function addReturnToState(url: string, returnTo?: string): string {
+  if (!returnTo) return url;
+  
+  const urlObj = new URL(url);
+  const state = encodeURIComponent(
+    Buffer.from(JSON.stringify({ returnPathname: returnTo })).toString('base64')
+  );
+  urlObj.searchParams.set('state', state);
+  return urlObj.toString();
+}
 
 /**
  * Create getUser helper
  */
-export function createGetUser(authKitInstance: any) {
+export function createGetUser(_authKitInstance: AuthKitInstance) {
   return async (event: RequestEvent) => {
     const auth = event.locals.auth as AuthKitAuth;
     return auth?.user || null;
@@ -15,7 +32,7 @@ export function createGetUser(authKitInstance: any) {
 /**
  * Create getSignInUrl helper
  */
-export function createGetSignInUrl(authKitInstance: any) {
+export function createGetSignInUrl(authKitInstance: AuthKitInstance) {
   return async (options?: SignInOptions) => {
     // The authkit-session getSignInUrl returns a promise
     const url = await authKitInstance.getSignInUrl({
@@ -23,22 +40,14 @@ export function createGetSignInUrl(authKitInstance: any) {
       loginHint: options?.loginHint,
     });
     
-    // If we have a returnTo, we need to update the state in the URL
-    if (options?.returnTo) {
-      const urlObj = new URL(url);
-      const state = btoa(JSON.stringify({ returnPathname: options.returnTo }));
-      urlObj.searchParams.set('state', state);
-      return urlObj.toString();
-    }
-    
-    return url;
+    return addReturnToState(url, options?.returnTo);
   };
 }
 
 /**
  * Create getSignUpUrl helper
  */
-export function createGetSignUpUrl(authKitInstance: any) {
+export function createGetSignUpUrl(authKitInstance: AuthKitInstance) {
   return async (options?: SignInOptions) => {
     // The authkit-session getSignUpUrl returns a promise
     const url = await authKitInstance.getSignUpUrl({
@@ -46,22 +55,14 @@ export function createGetSignUpUrl(authKitInstance: any) {
       loginHint: options?.loginHint,
     });
     
-    // If we have a returnTo, we need to update the state in the URL
-    if (options?.returnTo) {
-      const urlObj = new URL(url);
-      const state = btoa(JSON.stringify({ returnPathname: options.returnTo }));
-      urlObj.searchParams.set('state', state);
-      return urlObj.toString();
-    }
-    
-    return url;
+    return addReturnToState(url, options?.returnTo);
   };
 }
 
 /**
  * Create signOut helper
  */
-export function createSignOut(authKitInstance: any) {
+export function createSignOut(authKitInstance: AuthKitInstance) {
   return async (event: RequestEvent) => {
     // Use authkit-session's signOut method
     const response = await authKitInstance.signOut(
@@ -81,7 +82,7 @@ export function createSignOut(authKitInstance: any) {
 /**
  * Create switchOrganization helper
  */
-export function createSwitchOrganization(authKitInstance: any) {
+export function createSwitchOrganization(authKitInstance: AuthKitInstance) {
   return async (event: RequestEvent, { organizationId }: { organizationId: string }) => {
     const auth = event.locals.auth as AuthKitAuth;
 
@@ -100,7 +101,7 @@ export function createSwitchOrganization(authKitInstance: any) {
 /**
  * Create handleCallback helper for OAuth callback
  */
-export function createHandleCallback(authKitInstance: any) {
+export function createHandleCallback(authKitInstance: AuthKitInstance) {
   return () => {
     return async ({ url }: RequestEvent) => {
       const code = url.searchParams.get('code');
@@ -110,7 +111,8 @@ export function createHandleCallback(authKitInstance: any) {
       // Handle OAuth errors
       if (error) {
         console.error('OAuth error:', error);
-        throw redirect(302, '/auth/error?message=' + encodeURIComponent(error));
+        const errorCode = error === 'access_denied' ? 'ACCESS_DENIED' : 'AUTH_ERROR';
+        throw redirect(302, `/auth/error?code=${errorCode}`);
       }
 
       if (!code) {
@@ -141,7 +143,7 @@ export function createHandleCallback(authKitInstance: any) {
         return response;
       } catch (err) {
         console.error('Authentication error:', err);
-        throw redirect(302, '/auth/error?message=Authentication+failed');
+        throw redirect(302, '/auth/error?code=AUTH_FAILED');
       }
     };
   };
@@ -150,7 +152,7 @@ export function createHandleCallback(authKitInstance: any) {
 /**
  * Create refreshSession helper
  */
-export function createRefreshSession(authKitInstance: any) {
+export function createRefreshSession(authKitInstance: AuthKitInstance) {
   return async (event: RequestEvent) => {
     const response = await authKitInstance.refreshSession(event.request, new Response());
 
