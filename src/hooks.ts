@@ -14,7 +14,7 @@ function createAuthKitAuth(authResult: any): AuthKitAuth {
     permissions: authResult.claims?.permissions || [],
     sessionId: authResult.sessionId,
     impersonator: authResult.impersonator || null,
-    accessToken: authResult.accessToken
+    accessToken: authResult.accessToken,
   };
 }
 
@@ -28,7 +28,7 @@ function createEmptyAuth(): AuthKitAuth {
     role: null,
     permissions: [],
     sessionId: undefined,
-    impersonator: null
+    impersonator: null,
   };
 }
 
@@ -36,9 +36,7 @@ function createEmptyAuth(): AuthKitAuth {
  * Creates a SvelteKit handle function for AuthKit
  * Automatically manages sessions and populates event.locals.auth
  */
-export function createAuthKitHandle(
-  authKitInstance: AuthKitInstance
-): (options?: AuthKitHandleOptions) => Handle {
+export function createAuthKitHandle(authKitInstance: AuthKitInstance): (options?: AuthKitHandleOptions) => Handle {
   return (options?: AuthKitHandleOptions) => {
     const { debug = false, onError, config } = options || {};
 
@@ -56,7 +54,7 @@ export function createAuthKitHandle(
 
         // Get authentication info for this request
         const authResult = await authKitInstance.withAuth(event.request);
-        
+
         // Populate locals with auth data
         event.locals.auth = createAuthKitAuth(authResult);
 
@@ -66,14 +64,14 @@ export function createAuthKitHandle(
 
         // Continue with the request
         const response = await resolve(event);
-        
+
         // The authkit-session library handles session refresh internally
         return response;
       } catch (error) {
         if (debug) {
           console.error('[AuthKit] Error in handle:', error);
         }
-        
+
         if (onError) {
           onError(error as Error);
         }
@@ -86,3 +84,4 @@ export function createAuthKitHandle(
     };
   };
 }
+

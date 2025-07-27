@@ -1,7 +1,6 @@
 import type { RequestEvent } from '@sveltejs/kit';
 import { configure, createAuthKitFactory } from '@workos/authkit-session';
 import { createAuthKitHandle } from './hooks.js';
-import { SvelteKitSessionEncryption } from './server/adapters/encryption.js';
 import { SvelteKitStorage } from './server/adapters/storage.js';
 import {
   createGetSignInUrl,
@@ -88,7 +87,6 @@ function validateConfig(config: AuthKitConfig): void {
 function createAuthKitInstance(config: AuthKitConfig): AuthKitInstance {
   return createAuthKitFactory<Request, Response>({
     sessionStorageFactory: () => new SvelteKitStorage(config),
-    sessionEncryptionFactory: () => new SvelteKitSessionEncryption(),
   });
 }
 

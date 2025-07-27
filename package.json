@@ -49,8 +49,7 @@
   },
   "dependencies": {
     "@workos/authkit-session": "^0.0.1-alpha.1",
-    "cookie": "^1.0.2",
-    "iron-webcrypto": "^1.2.1"
+    "cookie": "^1.0.2"
   },
   "devDependencies": {
     "@sveltejs/kit": "^2.26.1",
