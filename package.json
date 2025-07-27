@@ -42,7 +42,7 @@
     "url": "https://github.com/workos/authkit-sveltekit.git"
   },
   "peerDependencies": {
-    "@sveltejs/kit": "^2.0.0"
+    "@sveltejs/kit": ">=2.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
