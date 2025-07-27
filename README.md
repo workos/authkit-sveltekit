@@ -88,7 +88,9 @@ export const load = authKit.withAuth(async ({ auth }) => {
   // auth.user is guaranteed to exist
   return {
     user: auth.user,
-    organization: auth.organization
+    organizationId: auth.organizationId,
+    role: auth.role,
+    permissions: auth.permissions
   };
 });
 ```
@@ -122,7 +124,19 @@ Get the WorkOS sign-in URL.
 ```typescript
 const signInUrl = authKit.getSignInUrl({
   returnTo: '/dashboard',
-  organizationId: 'org_123' // optional
+  organizationId: 'org_123', // optional
+  loginHint: 'user@example.com' // optional
+});
+```
+
+#### `authKit.getSignUpUrl(options)`
+Get the WorkOS sign-up URL.
+
+```typescript
+const signUpUrl = authKit.getSignUpUrl({
+  returnTo: '/dashboard',
+  organizationId: 'org_123', // optional
+  loginHint: 'user@example.com' // optional
 });
 ```
 
@@ -149,7 +163,19 @@ export const handle = authKitHandle({
 });
 ```
 
-## Configuration Options
+## Configuration
+
+```typescript
+interface AuthKitConfig {
+  clientId: string;              // WorkOS Client ID
+  apiKey: string;                // WorkOS API Key
+  redirectUri: string;           // OAuth redirect URI
+  cookiePassword: string;        // Cookie encryption password (min 32 chars)
+  cookieName?: string;           // Custom cookie name (default: 'wos-session')
+  cookieDomain?: string;         // Cookie domain restriction
+  cookieMaxAge?: number;         // Cookie max age in seconds (default: 400 days)
+}
+```
 
 ### Environment Variables
 
@@ -222,10 +248,26 @@ export const actions = {
 <script lang="ts">
   import { authKit } from '@workos/authkit-sveltekit';
   
-  const signInUrl = authKit.getSignInUrl({ returnTo: '/dashboard' });
+  // Note: These methods are async and should be called server-side
+  // For client-side, pass the URL from a server load function
 </script>
 
-<a href={signInUrl}>Sign In</a>
+<!-- Use URLs generated server-side -->
+<a href={data.signInUrl}>Sign In</a>
+<a href={data.signUpUrl}>Sign Up</a>
+```
+
+Server-side load function:
+```typescript
+// +page.server.ts
+import { authKit } from '@workos/authkit-sveltekit';
+
+export const load = async () => {
+  return {
+    signInUrl: await authKit.getSignInUrl({ returnTo: '/dashboard' }),
+    signUpUrl: await authKit.getSignUpUrl({ returnTo: '/dashboard' })
+  };
+};
 ```
 
 ### Form Actions
@@ -252,6 +294,10 @@ export const load: PageServerLoad = async ({ locals }) => {
   if (locals.auth.user) {
     // TypeScript knows user exists and its shape
     console.log(locals.auth.user.email);
+    console.log(locals.auth.organizationId);
+    console.log(locals.auth.role);
+    console.log(locals.auth.permissions);
+    console.log(locals.auth.accessToken);
   }
 };
 ```
