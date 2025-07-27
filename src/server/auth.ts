@@ -91,7 +91,7 @@ export function createSwitchOrganization(authKitInstance: AuthKitInstance) {
     }
 
     // Use the authkit-session switchToOrganization method
-    const response = await authKitInstance.switchToOrganization(event.request, new Response(), { organizationId });
+    const response = await authKitInstance.switchToOrganization(event.request, new Response(), organizationId);
 
     // Redirect to refresh the page with new organization context
     throw redirect(302, event.url.pathname);
@@ -105,7 +105,7 @@ export function createHandleCallback(authKitInstance: AuthKitInstance) {
   return () => {
     return async ({ url }: RequestEvent) => {
       const code = url.searchParams.get('code');
-      const state = url.searchParams.get('state');
+      const state = url.searchParams.get('state') || undefined;
       const error = url.searchParams.get('error');
 
       // Handle OAuth errors
@@ -151,12 +151,12 @@ export function createHandleCallback(authKitInstance: AuthKitInstance) {
 
 /**
  * Create refreshSession helper
+ * Note: Session refresh is handled automatically by authkit-session
  */
 export function createRefreshSession(authKitInstance: AuthKitInstance) {
   return async (event: RequestEvent) => {
-    const response = await authKitInstance.refreshSession(event.request, new Response());
-
-    // Return whether refresh was successful
-    return response.status === 200;
+    // Session refresh is handled automatically by withAuth
+    // This is a no-op but kept for API compatibility
+    return true;
   };
 }

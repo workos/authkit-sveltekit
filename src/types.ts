@@ -1,5 +1,5 @@
 import type { RequestEvent } from '@sveltejs/kit';
-import type { User, Organization, Impersonator } from '@workos/authkit-session';
+import type { User, Impersonator } from '@workos/authkit-session';
 
 /**
  * Configuration options for AuthKit SvelteKit integration
@@ -26,7 +26,7 @@ export interface AuthKitConfig {
  */
 export interface AuthKitAuth {
   user: User | null;
-  organization?: Organization | null;
+  organizationId?: string | null;
   role?: string | null;
   permissions?: string[];
   sessionId?: string;

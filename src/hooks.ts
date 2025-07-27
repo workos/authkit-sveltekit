@@ -1,15 +1,16 @@
 import type { Handle } from '@sveltejs/kit';
 import type { AuthKitHandleOptions, AuthKitAuth } from './types.js';
+import type { createAuthKitFactory, AuthResult } from '@workos/authkit-session';
 
-type AuthKitInstance = Parameters<typeof createAuthKitHandle>[0];
+type AuthKitInstance = ReturnType<typeof createAuthKitFactory<Request, Response>>;
 
 /**
  * Create AuthKitAuth object from authkit-session result
  */
-function createAuthKitAuth(authResult: any): AuthKitAuth {
+function createAuthKitAuth(authResult: AuthResult): AuthKitAuth {
   return {
     user: authResult.user || null,
-    organization: authResult.claims?.org_id ? { id: authResult.claims.org_id } : null,
+    organizationId: authResult.claims?.org_id || null,
     role: authResult.claims?.role || null,
     permissions: authResult.claims?.permissions || [],
     sessionId: authResult.sessionId,
@@ -24,7 +25,7 @@ function createAuthKitAuth(authResult: any): AuthKitAuth {
 function createEmptyAuth(): AuthKitAuth {
   return {
     user: null,
-    organization: null,
+    organizationId: null,
     role: null,
     permissions: [],
     sessionId: undefined,
