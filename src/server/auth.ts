@@ -12,7 +12,7 @@ function addReturnToState(url: string, returnTo?: string): string {
   if (!returnTo) return url;
 
   const urlObj = new URL(url);
-  const state = encodeURIComponent(Buffer.from(JSON.stringify({ returnPathname: returnTo })).toString('base64'));
+  const state = encodeURIComponent(btoa(JSON.stringify({ returnPathname: returnTo })));
   urlObj.searchParams.set('state', state);
   return urlObj.toString();
 }
