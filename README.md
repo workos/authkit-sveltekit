@@ -1,5 +1,8 @@
 # AuthKit SDK for SvelteKit
 
+> [!WARNING]
+> This is prerelease software. APIs may change without notice.
+
 The official WorkOS AuthKit SDK for SvelteKit applications. Provides seamless authentication with minimal setup.
 
 ## Features
@@ -59,7 +62,7 @@ configureAuthKit({
   clientId: env.WORKOS_CLIENT_ID,
   apiKey: env.WORKOS_API_KEY,
   redirectUri: env.WORKOS_REDIRECT_URI,
-  cookiePassword: env.WORKOS_COOKIE_PASSWORD
+  cookiePassword: env.WORKOS_COOKIE_PASSWORD,
 });
 
 export const handle = authKitHandle();
@@ -90,7 +93,7 @@ export const load = authKit.withAuth(async ({ auth }) => {
     user: auth.user,
     organizationId: auth.organizationId,
     role: auth.role,
-    permissions: auth.permissions
+    permissions: auth.permissions,
   };
 });
 ```
@@ -100,6 +103,7 @@ export const load = authKit.withAuth(async ({ auth }) => {
 ### Authentication Helpers
 
 #### `authKit.withAuth(handler)`
+
 Protect a route or action, redirecting unauthenticated users to sign in.
 
 ```typescript
@@ -109,6 +113,7 @@ export const load = authKit.withAuth(async ({ auth, ...event }) => {
 ```
 
 #### `authKit.getUser(event)`
+
 Get the current user (nullable).
 
 ```typescript
@@ -119,47 +124,51 @@ export const load = async (event) => {
 ```
 
 #### `authKit.getSignInUrl(options)`
+
 Get the WorkOS sign-in URL.
 
 ```typescript
 const signInUrl = authKit.getSignInUrl({
   returnTo: '/dashboard',
   organizationId: 'org_123', // optional
-  loginHint: 'user@example.com' // optional
+  loginHint: 'user@example.com', // optional
 });
 ```
 
 #### `authKit.getSignUpUrl(options)`
+
 Get the WorkOS sign-up URL.
 
 ```typescript
 const signUpUrl = authKit.getSignUpUrl({
   returnTo: '/dashboard',
   organizationId: 'org_123', // optional
-  loginHint: 'user@example.com' // optional
+  loginHint: 'user@example.com', // optional
 });
 ```
 
 #### `authKit.signOut(event)`
+
 Sign out the current user.
 
 ```typescript
 export const actions = {
   signout: async (event) => {
     return authKit.signOut(event);
-  }
+  },
 };
 ```
 
 ### Hooks
 
 #### `authKitHandle(options)`
+
 SvelteKit handle function that manages authentication.
 
 ```typescript
 export const handle = authKitHandle({
   debug: true, // Enable debug logging
-  onError: (error) => console.error('Auth error:', error)
+  onError: (error) => console.error('Auth error:', error),
 });
 ```
 
@@ -167,13 +176,13 @@ export const handle = authKitHandle({
 
 ```typescript
 interface AuthKitConfig {
-  clientId: string;              // WorkOS Client ID
-  apiKey: string;                // WorkOS API Key
-  redirectUri: string;           // OAuth redirect URI
-  cookiePassword: string;        // Cookie encryption password (min 32 chars)
-  cookieName?: string;           // Custom cookie name (default: 'wos-session')
-  cookieDomain?: string;         // Cookie domain restriction
-  cookieMaxAge?: number;         // Cookie max age in seconds (default: 400 days)
+  clientId: string; // WorkOS Client ID
+  apiKey: string; // WorkOS API Key
+  redirectUri: string; // OAuth redirect URI
+  cookiePassword: string; // Cookie encryption password (min 32 chars)
+  cookieName?: string; // Custom cookie name (default: 'wos-session')
+  cookieDomain?: string; // Cookie domain restriction
+  cookieMaxAge?: number; // Cookie max age in seconds (default: 400 days)
 }
 ```
 
@@ -192,7 +201,7 @@ configureAuthKit({
   clientId: env.WORKOS_CLIENT_ID,
   apiKey: env.WORKOS_API_KEY,
   redirectUri: env.WORKOS_REDIRECT_URI,
-  cookiePassword: env.WORKOS_COOKIE_PASSWORD
+  cookiePassword: env.WORKOS_COOKIE_PASSWORD,
 });
 
 export const handle = authKitHandle();
@@ -209,7 +218,7 @@ configureAuthKit({
   clientId: WORKOS_CLIENT_ID,
   apiKey: WORKOS_API_KEY,
   redirectUri: WORKOS_REDIRECT_URI,
-  cookiePassword: WORKOS_COOKIE_PASSWORD
+  cookiePassword: WORKOS_COOKIE_PASSWORD,
 });
 
 export const handle = authKitHandle();
@@ -236,9 +245,9 @@ export const actions = {
   switchOrg: async (event) => {
     const formData = await event.request.formData();
     const orgId = formData.get('organizationId') as string;
-    
+
     return authKit.switchOrganization(event, { organizationId: orgId });
-  }
+  },
 };
 ```
 
@@ -247,7 +256,7 @@ export const actions = {
 ```svelte
 <script lang="ts">
   import { authKit } from '@workos/authkit-sveltekit';
-  
+
   // Note: These methods are async and should be called server-side
   // For client-side, pass the URL from a server load function
 </script>
@@ -258,6 +267,7 @@ export const actions = {
 ```
 
 Server-side load function:
+
 ```typescript
 // +page.server.ts
 import { authKit } from '@workos/authkit-sveltekit';
@@ -265,7 +275,7 @@ import { authKit } from '@workos/authkit-sveltekit';
 export const load = async () => {
   return {
     signInUrl: await authKit.getSignInUrl({ returnTo: '/dashboard' }),
-    signUpUrl: await authKit.getSignUpUrl({ returnTo: '/dashboard' })
+    signUpUrl: await authKit.getSignUpUrl({ returnTo: '/dashboard' }),
   };
 };
 ```
@@ -279,7 +289,7 @@ export const actions = {
   update: authKit.withAuth(async ({ auth, request }) => {
     const formData = await request.formData();
     // Process authenticated form submission
-  })
+  }),
 };
 ```
 

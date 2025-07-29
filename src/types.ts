@@ -64,4 +64,3 @@ export interface SignInOptions {
 export type AuthenticatedHandler<T = unknown> = (
   event: RequestEvent & { auth: Required<AuthKitAuth> },
 ) => T | Promise<T>;
-

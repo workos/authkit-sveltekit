@@ -85,4 +85,3 @@ export function createAuthKitHandle(authKitInstance: AuthKitInstance): (options?
     };
   };
 }
-

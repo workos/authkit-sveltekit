@@ -24,7 +24,8 @@
     "test": "vitest",
     "test:coverage": "vitest --coverage",
     "lint": "eslint src --ext .ts",
-    "format": "prettier --write src/**/*.ts",
+    "format": "prettier --write .",
+    "prettier": "prettier --check .",
     "type-check": "tsc --noEmit",
     "prepublishOnly": "npm run build && npm run test"
   },
@@ -45,11 +46,16 @@
     "@sveltejs/kit": ">=2.0.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "dependencies": {
-    "@workos/authkit-session": "^0.0.1-alpha.1",
+    "@workos/authkit-session": "^0.0.1-alpha.3",
     "cookie": "^1.0.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "cookie": ">=0.7.0"
+    }
   },
   "devDependencies": {
     "@sveltejs/kit": "^2.26.1",
@@ -64,10 +70,5 @@
     "tsup": "^8.5.0",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
-  },
-  "pnpm": {
-    "overrides": {
-      "@workos/authkit-session": "file:../authkit-session"
-    }
   }
 }

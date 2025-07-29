@@ -21,12 +21,12 @@ export function createWithAuth(authKitInstance: AuthKitInstance) {
         const signInUrl = await authKitInstance.getSignInUrl({
           redirectUri: process.env.WORKOS_REDIRECT_URI,
         });
-        
+
         // Add return path to state
         const urlObj = new URL(signInUrl);
         const state = btoa(JSON.stringify({ returnPathname: event.url.pathname }));
         urlObj.searchParams.set('state', state);
-        
+
         // Redirect to sign-in
         throw redirect(302, urlObj.toString());
       }
