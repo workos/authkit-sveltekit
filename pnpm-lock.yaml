@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  cookie: '>=0.7.0'
+
 importers:
 
   .:
@@ -12,7 +15,7 @@ importers:
         specifier: ^0.0.1-alpha.3
         version: 0.0.1-alpha.3
       cookie:
-        specifier: ^1.0.2
+        specifier: '>=0.7.0'
         version: 1.0.2
     devDependencies:
       '@sveltejs/kit':
@@ -788,18 +791,6 @@ packages:
   consola@3.4.2:
     resolution: {integrity: sha512-5IKcdX0nnYavi6G7TtOhwkYzyjfJlatbjMjuLSfE2kYT5pMDOilZ4OvMhi637CcDICTmz3wARPoyhqyX1Y+XvA==}
     engines: {node: ^14.18.0 || >=16.10.0}
-
-  cookie@0.5.0:
-    resolution: {integrity: sha512-YZ3GUyn/o8gfKJlnlX7g7xq4gyO6OSuhGPKaaGssGB2qgDUS0gPgtTvoyZLTt9Ab6dC4hfc9dV5arkvc/OCmrw==}
-    engines: {node: '>= 0.6'}
-
-  cookie@0.6.0:
-    resolution: {integrity: sha512-U71cyTamuh1CRNCfpGY6to28lxvNwPG4Guz/EVjgf3Jmzv0vlDp1atT9eS5dDjMYHucpHbWns6Lwf3BKz6svdw==}
-    engines: {node: '>= 0.6'}
-
-  cookie@0.7.2:
-    resolution: {integrity: sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w==}
-    engines: {node: '>= 0.6'}
 
   cookie@1.0.2:
     resolution: {integrity: sha512-9Kr/j4O16ISv8zBBhJoi4bXOYNTkFLOqSL3UDB0njXxCXNezjeyVrJyGOWtgfs/q2km1gwBcfH8q1yEGoMYunA==}
@@ -1984,7 +1975,7 @@ snapshots:
       '@sveltejs/vite-plugin-svelte': 6.1.0(svelte@5.36.17)(vite@7.0.6(@types/node@24.1.0))
       '@types/cookie': 0.6.0
       acorn: 8.15.0
-      cookie: 0.6.0
+      cookie: 1.0.2
       devalue: 5.1.1
       esm-env: 1.2.2
       kleur: 4.1.5
@@ -2410,12 +2401,6 @@ snapshots:
 
   consola@3.4.2: {}
 
-  cookie@0.5.0: {}
-
-  cookie@0.6.0: {}
-
-  cookie@0.7.2: {}
-
   cookie@1.0.2: {}
 
   cross-spawn@7.0.6:
@@ -2697,12 +2682,12 @@ snapshots:
       '@types/express': 4.17.23
       '@types/koa': 2.15.0
       '@types/node': 17.0.45
-      cookie: 0.5.0
+      cookie: 1.0.2
       iron-webcrypto: 0.2.8
 
   iron-session@8.0.4:
     dependencies:
-      cookie: 0.7.2
+      cookie: 1.0.2
       iron-webcrypto: 1.2.1
       uncrypto: 0.1.3
 
