@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@workos/authkit-session':
-        specifier: ^0.0.1-alpha.1
-        version: 0.0.1-alpha.1
+        specifier: ^0.0.1-alpha.3
+        version: 0.0.1-alpha.3
       cookie:
         specifier: ^1.0.2
         version: 1.0.2
@@ -649,9 +649,9 @@ packages:
     resolution: {integrity: sha512-MSeEpWLLVsk7HVKdnwaWj0S03bUquLwNCXah/fBun5nZIZhQLDZtK3s1nAexhU+UEUclB4T+xYeaegYK6sshoQ==}
     engines: {node: '>=16'}
 
-  '@workos/authkit-session@0.0.1-alpha.1':
-    resolution: {integrity: sha512-jsgNcd07izbX6X7MdeSk/Zu9aoDfLMHN96IF8eYOWKr7+CjesToVLpe//hJ7uz5YR9jUQ/Bi5LhrJ5vSbVOQvQ==}
-    engines: {node: '>=22.0.0'}
+  '@workos/authkit-session@0.0.1-alpha.3':
+    resolution: {integrity: sha512-bLlZfvR/cg0afW4OT3yMWC/5F3GP4x3td+4+KlBLN2DIOPCt8ORJKwfZ9om4twvreeQVW0KVsPnX+qyWWwafqQ==}
+    engines: {node: '>=20.0.0'}
 
   acorn-jsx@5.3.2:
     resolution: {integrity: sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ==}
@@ -2278,7 +2278,7 @@ snapshots:
       - koa
       - next
 
-  '@workos/authkit-session@0.0.1-alpha.1':
+  '@workos/authkit-session@0.0.1-alpha.3':
     dependencies:
       '@workos-inc/node': 7.62.1
       iron-session: 8.0.4
