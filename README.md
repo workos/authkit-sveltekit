@@ -1,6 +1,5 @@
 # AuthKit SDK for SvelteKit
 
-
 > [!WARNING]
 > This is prerelease software. APIs may change without notice.
 
