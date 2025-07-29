@@ -4,16 +4,13 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  '@workos/authkit-session': file:../authkit-session
-
 importers:
 
   .:
     dependencies:
       '@workos/authkit-session':
-        specifier: file:../authkit-session
-        version: file:../authkit-session
+        specifier: ^0.0.1-alpha.1
+        version: 0.0.1-alpha.1
       cookie:
         specifier: ^1.0.2
         version: 1.0.2
@@ -652,8 +649,8 @@ packages:
     resolution: {integrity: sha512-MSeEpWLLVsk7HVKdnwaWj0S03bUquLwNCXah/fBun5nZIZhQLDZtK3s1nAexhU+UEUclB4T+xYeaegYK6sshoQ==}
     engines: {node: '>=16'}
 
-  '@workos/authkit-session@file:../authkit-session':
-    resolution: {directory: ../authkit-session, type: directory}
+  '@workos/authkit-session@0.0.1-alpha.1':
+    resolution: {integrity: sha512-jsgNcd07izbX6X7MdeSk/Zu9aoDfLMHN96IF8eYOWKr7+CjesToVLpe//hJ7uz5YR9jUQ/Bi5LhrJ5vSbVOQvQ==}
     engines: {node: '>=22.0.0'}
 
   acorn-jsx@5.3.2:
@@ -2281,7 +2278,7 @@ snapshots:
       - koa
       - next
 
-  '@workos/authkit-session@file:../authkit-session':
+  '@workos/authkit-session@0.0.1-alpha.1':
     dependencies:
       '@workos-inc/node': 7.62.1
       iron-session: 8.0.4
