@@ -1,5 +1,9 @@
 # AuthKit SDK for SvelteKit
 
+
+> [!WARNING]
+> This is prerelease software. APIs may change without notice.
+
 The official WorkOS AuthKit SDK for SvelteKit applications. Provides seamless authentication with minimal setup.
 
 ## Features
