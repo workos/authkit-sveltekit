@@ -55,30 +55,30 @@ const REQUIRED_CONFIG_FIELDS = [
 ] as const;
 
 function validateConfig(config: AuthKitConfig): void {
-  const missing = REQUIRED_CONFIG_FIELDS
-    .filter(field => !config[field.key as keyof AuthKitConfig])
-    .map(field => field.envVar);
+  const missing = REQUIRED_CONFIG_FIELDS.filter((field) => !config[field.key as keyof AuthKitConfig]).map(
+    (field) => field.envVar,
+  );
 
   if (missing.length > 0) {
     throw new Error(
       `Missing required configuration: ${missing.join(', ')}\n\n` +
-      `Configure in your hooks.server.ts:\n\n` +
-      `import { configureAuthKit, authKitHandle } from '@workos/authkit-sveltekit';\n` +
-      `import { env } from '$env/dynamic/private';\n\n` +
-      `configureAuthKit({\n` +
-      `  clientId: env.WORKOS_CLIENT_ID,\n` +
-      `  apiKey: env.WORKOS_API_KEY,\n` +
-      `  redirectUri: env.WORKOS_REDIRECT_URI,\n` +
-      `  cookiePassword: env.WORKOS_COOKIE_PASSWORD\n` +
-      `});\n\n` +
-      `export const handle = authKitHandle();`
+        `Configure in your hooks.server.ts:\n\n` +
+        `import { configureAuthKit, authKitHandle } from '@workos/authkit-sveltekit';\n` +
+        `import { env } from '$env/dynamic/private';\n\n` +
+        `configureAuthKit({\n` +
+        `  clientId: env.WORKOS_CLIENT_ID,\n` +
+        `  apiKey: env.WORKOS_API_KEY,\n` +
+        `  redirectUri: env.WORKOS_REDIRECT_URI,\n` +
+        `  cookiePassword: env.WORKOS_COOKIE_PASSWORD\n` +
+        `});\n\n` +
+        `export const handle = authKitHandle();`,
     );
   }
 
   if (config.cookiePassword.length < 32) {
     throw new Error(
       'cookiePassword must be at least 32 characters long.\n' +
-      'Generate a secure password using: openssl rand -base64 24'
+        'Generate a secure password using: openssl rand -base64 24',
     );
   }
 }
@@ -114,10 +114,8 @@ export function configureAuthKit(config: AuthKitConfig): void {
 export const authKit = {
   withAuth: <T>(handler: AuthenticatedHandler<T>) => createWithAuth(getAuthKitInstance())(handler),
   getUser: (event: RequestEvent) => createGetUser(getAuthKitInstance())(event),
-  getSignInUrl: async (options?: SignInOptions) =>
-    createGetSignInUrl(getAuthKitInstance())(options),
-  getSignUpUrl: async (options?: SignInOptions) =>
-    createGetSignUpUrl(getAuthKitInstance())(options),
+  getSignInUrl: async (options?: SignInOptions) => createGetSignInUrl(getAuthKitInstance())(options),
+  getSignUpUrl: async (options?: SignInOptions) => createGetSignUpUrl(getAuthKitInstance())(options),
   signOut: (event: RequestEvent) => createSignOut(getAuthKitInstance())(event),
   switchOrganization: (event: RequestEvent, options: { organizationId: string }) =>
     createSwitchOrganization(getAuthKitInstance())(event, options),
@@ -127,4 +125,3 @@ export const authKit = {
 
 // Export the handle function for hooks with lazy initialization
 export const authKitHandle = (options?: AuthKitHandleOptions) => createAuthKitHandle(getAuthKitInstance())(options);
-

@@ -22,7 +22,7 @@ export class SvelteKitStorage implements SessionStorage<Request, Response> {
     httpOnly: true,
     secure: true,
     sameSite: 'lax' as const,
-    maxAge: 60 * 60 * 24 * 400 // 400 days
+    maxAge: 60 * 60 * 24 * 400, // 400 days
   };
 
   constructor(config?: Partial<AuthKitConfig>) {
@@ -56,7 +56,7 @@ export class SvelteKitStorage implements SessionStorage<Request, Response> {
     const newResponse = new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
-      headers: new Headers(response.headers)
+      headers: new Headers(response.headers),
     });
 
     const cookie = serialize(this.cookieName, sessionData, this.cookieOptions);
@@ -72,13 +72,13 @@ export class SvelteKitStorage implements SessionStorage<Request, Response> {
     const newResponse = new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
-      headers: new Headers(response.headers)
+      headers: new Headers(response.headers),
     });
 
     const cookie = serialize(this.cookieName, '', {
       ...this.cookieOptions,
       maxAge: 0,
-      expires: new Date(0)
+      expires: new Date(0),
     });
 
     newResponse.headers.append('Set-Cookie', cookie);
