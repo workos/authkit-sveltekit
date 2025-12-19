@@ -15,6 +15,9 @@ jobs:
   test:
     name: Publish to NPM
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -22,7 +25,7 @@ jobs:
           version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 24
           registry-url: 'https://registry.npmjs.org'
           cache: 'pnpm'
 
@@ -36,14 +39,10 @@ jobs:
 
       - name: Push Release
         if: ${{ !github.event.release.prerelease }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          pnpm publish --tag latest --access=public
+          pnpm publish --tag latest --access=public --no-git-checks --provenance
 
       - name: Push Pre-Release
         if: ${{ github.event.release.prerelease }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          pnpm publish --tag next --access=public
+          pnpm publish --tag next --access=public --no-git-checks --provenance
