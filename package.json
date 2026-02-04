@@ -55,7 +55,10 @@
   "pnpm": {
     "overrides": {
       "cookie": ">=0.7.0"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "devDependencies": {
     "@sveltejs/kit": "^2.50.2",
