@@ -49,7 +49,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@workos/authkit-session": "^0.0.1-alpha.3",
+    "@workos/authkit-session": "^0.3.4",
     "cookie": "^1.0.2"
   },
   "pnpm": {

@@ -1,15 +1,20 @@
 import type { Handle } from '@sveltejs/kit';
 import type { AuthKitHandleOptions, AuthKitAuth } from './types.js';
-import type { createAuthKitFactory, AuthResult } from '@workos/authkit-session';
+import type { createAuthService, AuthResult } from '@workos/authkit-session';
 
-type AuthKitInstance = ReturnType<typeof createAuthKitFactory<Request, Response>>;
+type AuthKitInstance = ReturnType<typeof createAuthService<Request, Response>>;
 
 /**
  * Create AuthKitAuth object from authkit-session result
  */
 function createAuthKitAuth(authResult: AuthResult): AuthKitAuth {
+  // AuthResult is a discriminated union - check user first
+  if (!authResult.user) {
+    return createEmptyAuth();
+  }
+
   return {
-    user: authResult.user || null,
+    user: authResult.user,
     organizationId: authResult.claims?.org_id || null,
     role: authResult.claims?.role || null,
     permissions: authResult.claims?.permissions || [],
@@ -54,7 +59,7 @@ export function createAuthKitHandle(authKitInstance: AuthKitInstance): (options?
         }
 
         // Get authentication info for this request
-        const authResult = await authKitInstance.withAuth(event.request);
+        const { auth: authResult, refreshedSessionData } = await authKitInstance.withAuth(event.request);
 
         // Populate locals with auth data
         event.locals.auth = createAuthKitAuth(authResult);
@@ -66,7 +71,17 @@ export function createAuthKitHandle(authKitInstance: AuthKitInstance): (options?
         // Continue with the request
         const response = await resolve(event);
 
-        // The authkit-session library handles session refresh internally
+        // If session was refreshed, save the new session data
+        if (refreshedSessionData) {
+          const { headers } = await authKitInstance.saveSession(undefined, refreshedSessionData);
+          if (headers) {
+            Object.entries(headers).forEach(([key, value]) => {
+              const headerValue = Array.isArray(value) ? value.join(', ') : value;
+              response.headers.set(key, headerValue);
+            });
+          }
+        }
+
         return response;
       } catch (error) {
         if (debug) {
