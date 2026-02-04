@@ -220,9 +220,7 @@ AuthKit SvelteKit provides ready-to-use Svelte components:
 
 ```svelte
 <!-- Custom sign-in button -->
-<SignInButton screenHint="sign-up" class="btn btn-primary">
-  Create Your Account
-</SignInButton>
+<SignInButton screenHint="sign-up" class="btn btn-primary">Create Your Account</SignInButton>
 
 <!-- User profile with custom template -->
 <UserProfile {user} let:user>
