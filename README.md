@@ -1,9 +1,8 @@
 # AuthKit SDK for SvelteKit
 
-> [!WARNING]
-> This is prerelease software. APIs may change without notice.
-
 The official WorkOS AuthKit SDK for SvelteKit applications. Provides seamless authentication with minimal setup.
+
+> **Looking for a complete example?** Check out the [example app](./example) in this repo.
 
 ## Features
 
@@ -29,7 +28,7 @@ Create a `.env` file in your project root:
 ```env
 WORKOS_CLIENT_ID=client_01234567890123456789012345
 WORKOS_API_KEY=sk_test_1234567890
-WORKOS_REDIRECT_URI=http://localhost:5173/auth/callback
+WORKOS_REDIRECT_URI=http://localhost:5173/callback
 WORKOS_COOKIE_PASSWORD=your-secure-password-at-least-32-chars
 ```
 
@@ -72,12 +71,16 @@ export const handle = authKitHandle();
 
 ### 4. Create Callback Route
 
-Create `src/routes/auth/callback/+server.ts`:
+Create `src/routes/callback/+server.ts`:
 
 ```typescript
 import { authKit } from '@workos/authkit-sveltekit';
+import type { RequestHandler } from './$types';
 
-export const GET = authKit.handleCallback();
+export const GET: RequestHandler = async (event) => {
+  const handler = authKit.handleCallback();
+  return handler(event);
+};
 ```
 
 ### 5. Protect Routes
