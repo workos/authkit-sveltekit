@@ -49,12 +49,12 @@ openssl rand -base64 32
 
 Certain environment variables are optional and can be used to debug or configure cookie settings.
 
-| Environment Variable | Default Value | Description |
-|---------------------|---------------|-------------|
-| `WORKOS_COOKIE_MAX_AGE` | `34560000` (400 days) | Maximum age of the cookie in seconds |
-| `WORKOS_COOKIE_DOMAIN` | None | Domain for the cookie. When empty, the cookie is only valid for the current domain |
-| `WORKOS_COOKIE_NAME` | `'workos_session'` | Name of the session cookie |
-| `WORKOS_COOKIE_SAMESITE` | `'lax'` | SameSite attribute for cookies. Options: `'lax'`, `'strict'`, or `'none'` |
+| Environment Variable     | Default Value         | Description                                                                        |
+| ------------------------ | --------------------- | ---------------------------------------------------------------------------------- |
+| `WORKOS_COOKIE_MAX_AGE`  | `34560000` (400 days) | Maximum age of the cookie in seconds                                               |
+| `WORKOS_COOKIE_DOMAIN`   | None                  | Domain for the cookie. When empty, the cookie is only valid for the current domain |
+| `WORKOS_COOKIE_NAME`     | `'workos_session'`    | Name of the session cookie                                                         |
+| `WORKOS_COOKIE_SAMESITE` | `'lax'`               | SameSite attribute for cookies. Options: `'lax'`, `'strict'`, or `'none'`          |
 
 Example usage:
 
@@ -90,7 +90,7 @@ import { createAuthKitHandle } from '@workos-inc/authkit-sveltekit';
 export const handle = createAuthKitHandle({
   protectedPaths: ['/dashboard', '/admin'],
   excludePaths: ['/login', '/logout', '/callback', '/public'],
-  loginPath: '/auth/signin'
+  loginPath: '/auth/signin',
 });
 ```
 
@@ -127,7 +127,7 @@ For custom configuration:
 import { loginHandler } from '@workos-inc/authkit-sveltekit';
 
 export const GET = loginHandler({
-  screenHint: 'sign-in' // or 'sign-up'
+  screenHint: 'sign-in', // or 'sign-up'
 });
 ```
 
@@ -156,7 +156,7 @@ export const GET = callbackHandler({
   onSuccess: async (user, session) => {
     // Custom logic after successful authentication
     console.log(`User ${user.email} signed in`);
-  }
+  },
 });
 ```
 
@@ -170,7 +170,7 @@ Use the authentication data that's automatically populated in `locals`:
 <!-- src/routes/+page.svelte -->
 <script>
   import { page } from '$app/stores';
-  
+
   $: user = $page.data.user;
 </script>
 
@@ -191,7 +191,7 @@ import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async ({ locals }) => {
   return {
-    user: locals.user
+    user: locals.user,
   };
 };
 ```
@@ -204,7 +204,7 @@ AuthKit SvelteKit provides ready-to-use Svelte components:
 <script>
   import { SignInButton, SignOutButton, UserProfile } from '@workos-inc/authkit-sveltekit/components';
   import { page } from '$app/stores';
-  
+
   $: user = $page.data.user;
 </script>
 
@@ -264,7 +264,7 @@ export const load = requireAuth(async ({ locals }) => {
   // locals.user is guaranteed to exist and fully typed
   return {
     user: locals.user,
-    dashboardData: await fetchDashboardData(locals.user.id)
+    dashboardData: await fetchDashboardData(locals.user.id),
   };
 });
 ```
@@ -281,7 +281,7 @@ import { withAuth } from '@workos-inc/authkit-sveltekit';
 export const GET = withAuth(async ({ locals }) => {
   return json({
     user: locals.user,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 });
 ```
@@ -298,7 +298,7 @@ export const handle = createAuthKitHandle({
   protectedPaths: ['/dashboard', '/admin'],
   excludePaths: ['/login', '/logout', '/callback', '/api/public'],
   loginPath: '/auth/signin',
-  populateLocals: true
+  populateLocals: true,
 });
 ```
 
@@ -312,7 +312,7 @@ const config = loadAuthKitEnv(); // Loads from WORKOS_* environment variables
 
 export const handle = createAuthKitHandle({
   ...config,
-  protectedPaths: ['/dashboard']
+  protectedPaths: ['/dashboard'],
 });
 ```
 
@@ -324,12 +324,12 @@ Access organization data through locals:
 // src/routes/dashboard/+page.server.ts
 export const load = requireAuth(async ({ locals }) => {
   const { user, organizationId, role, permissions } = locals;
-  
+
   return {
     user,
     organization: organizationId ? await getOrganization(organizationId) : null,
     userRole: role,
-    userPermissions: permissions
+    userPermissions: permissions,
   };
 });
 ```
@@ -341,7 +341,7 @@ Refresh user sessions to get the latest data:
 ```svelte
 <script>
   import { invalidateAll } from '$app/navigation';
-  
+
   async function refreshSession() {
     // Trigger a refresh of all load functions
     await invalidateAll();
@@ -439,7 +439,7 @@ import { getWorkOS } from '@workos-inc/authkit-ssr';
 
 const workos = getWorkOS();
 const organizations = await workos.organizations.listOrganizations({
-  limit: 10
+  limit: 10,
 });
 ```
 
@@ -455,7 +455,7 @@ class CustomStorage extends SvelteKitStorage {
 }
 
 const sessionManager = createSvelteKitAuthKit({
-  storage: new CustomStorage(config)
+  storage: new CustomStorage(config),
 });
 ```
 
@@ -484,29 +484,29 @@ export interface AuthLocals {
 
 ### Functions
 
-| Function | Description |
-|----------|-------------|
-| `createAuthKitHandle(options?)` | Creates SvelteKit handle function |
-| `requireAuth(loadFn, loginPath?)` | Wraps load functions to require auth |
-| `withAuth(handler)` | Wraps API handlers to require auth |
-| `loadAuthKitEnv(prefix?)` | Loads config from environment variables |
+| Function                          | Description                             |
+| --------------------------------- | --------------------------------------- |
+| `createAuthKitHandle(options?)`   | Creates SvelteKit handle function       |
+| `requireAuth(loadFn, loginPath?)` | Wraps load functions to require auth    |
+| `withAuth(handler)`               | Wraps API handlers to require auth      |
+| `loadAuthKitEnv(prefix?)`         | Loads config from environment variables |
 
 ### Components
 
-| Component | Props | Description |
-|-----------|-------|-------------|
-| `SignInButton` | `screenHint?, returnPathname?, class?` | Pre-built sign-in button |
-| `SignOutButton` | `returnTo?, class?` | Pre-built sign-out button |
-| `UserProfile` | `user, children?` | User profile display |
+| Component       | Props                                  | Description               |
+| --------------- | -------------------------------------- | ------------------------- |
+| `SignInButton`  | `screenHint?, returnPathname?, class?` | Pre-built sign-in button  |
+| `SignOutButton` | `returnTo?, class?`                    | Pre-built sign-out button |
+| `UserProfile`   | `user, children?`                      | User profile display      |
 
 ### Stores
 
-| Store | Type | Description |
-|-------|------|-------------|
-| `authUser` | `Readable<User \| null>` | Current user state |
-| `isAuthenticated` | `Readable<boolean>` | Authentication status |
-| `userOrganizations` | `Readable<Organization[]>` | User's organizations |
-| `currentOrganization` | `Readable<Organization \| null>` | Current organization |
+| Store                 | Type                             | Description           |
+| --------------------- | -------------------------------- | --------------------- |
+| `authUser`            | `Readable<User \| null>`         | Current user state    |
+| `isAuthenticated`     | `Readable<boolean>`              | Authentication status |
+| `userOrganizations`   | `Readable<Organization[]>`       | User's organizations  |
+| `currentOrganization` | `Readable<Organization \| null>` | Current organization  |
 
 ## Examples
 
@@ -530,12 +530,12 @@ If you're migrating from a manual WorkOS implementation:
 
 ### Configuration mapping
 
-| Old Pattern | New Pattern |
-|-------------|-------------|
-| Custom session management | `createAuthKitHandle()` |
-| Manual login routes | `export { GET } from '@workos-inc/authkit-sveltekit/login'` |
-| Custom auth checks | `requireAuth()`, `withAuth()` |
-| Manual user state | `$page.data.user`, stores |
+| Old Pattern               | New Pattern                                                 |
+| ------------------------- | ----------------------------------------------------------- |
+| Custom session management | `createAuthKitHandle()`                                     |
+| Manual login routes       | `export { GET } from '@workos-inc/authkit-sveltekit/login'` |
+| Custom auth checks        | `requireAuth()`, `withAuth()`                               |
+| Manual user state         | `$page.data.user`, stores                                   |
 
 ## Troubleshooting
 
@@ -574,7 +574,7 @@ Enable debug logging to troubleshoot issues:
 import { createAuthKitHandle } from '@workos-inc/authkit-sveltekit';
 
 export const handle = createAuthKitHandle({
-  debug: true // Enable debug logs
+  debug: true, // Enable debug logs
 });
 ```
 
