@@ -1,5 +1,5 @@
 import type { RequestEvent } from '@sveltejs/kit';
-import { configure, createAuthKitFactory } from '@workos/authkit-session';
+import { configure, createAuthService } from '@workos/authkit-session';
 import { createAuthKitHandle } from './hooks.js';
 import { SvelteKitStorage } from './server/adapters/storage.js';
 import {
@@ -14,7 +14,7 @@ import {
 import { createWithAuth } from './server/middleware.js';
 import type { AuthKitConfig, AuthKitHandleOptions, AuthenticatedHandler, SignInOptions } from './types.js';
 
-type AuthKitInstance = ReturnType<typeof createAuthKitFactory<Request, Response>>;
+type AuthKitInstance = ReturnType<typeof createAuthService<Request, Response>>;
 
 // Re-export types
 export type { AuthKitAuth, AuthKitConfig } from './types.js';
@@ -85,7 +85,7 @@ function validateConfig(config: AuthKitConfig): void {
 
 // Create AuthKit instance with the given configuration
 function createAuthKitInstance(config: AuthKitConfig): AuthKitInstance {
-  return createAuthKitFactory<Request, Response>({
+  return createAuthService<Request, Response>({
     sessionStorageFactory: () => new SvelteKitStorage(config),
   });
 }

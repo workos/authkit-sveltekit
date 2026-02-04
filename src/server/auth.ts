@@ -1,21 +1,9 @@
 import type { RequestEvent } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
-import type { createAuthKitFactory } from '@workos/authkit-session';
+import type { createAuthService } from '@workos/authkit-session';
 import type { SignInOptions, AuthKitAuth } from '../types.js';
 
-type AuthKitInstance = ReturnType<typeof createAuthKitFactory<Request, Response>>;
-
-/**
- * Helper to add returnTo path to OAuth state parameter
- */
-function addReturnToState(url: string, returnTo?: string): string {
-  if (!returnTo) return url;
-
-  const urlObj = new URL(url);
-  const state = encodeURIComponent(btoa(JSON.stringify({ returnPathname: returnTo })));
-  urlObj.searchParams.set('state', state);
-  return urlObj.toString();
-}
+type AuthKitInstance = ReturnType<typeof createAuthService<Request, Response>>;
 
 /**
  * Create getUser helper
@@ -32,13 +20,11 @@ export function createGetUser(_authKitInstance: AuthKitInstance) {
  */
 export function createGetSignInUrl(authKitInstance: AuthKitInstance) {
   return async (options?: SignInOptions) => {
-    // The authkit-session getSignInUrl returns a promise
-    const url = await authKitInstance.getSignInUrl({
+    return authKitInstance.getSignInUrl({
+      returnPathname: options?.returnTo,
       organizationId: options?.organizationId,
       loginHint: options?.loginHint,
     });
-
-    return addReturnToState(url, options?.returnTo);
   };
 }
 
@@ -47,13 +33,11 @@ export function createGetSignInUrl(authKitInstance: AuthKitInstance) {
  */
 export function createGetSignUpUrl(authKitInstance: AuthKitInstance) {
   return async (options?: SignInOptions) => {
-    // The authkit-session getSignUpUrl returns a promise
-    const url = await authKitInstance.getSignUpUrl({
+    return authKitInstance.getSignUpUrl({
+      returnPathname: options?.returnTo,
       organizationId: options?.organizationId,
       loginHint: options?.loginHint,
     });
-
-    return addReturnToState(url, options?.returnTo);
   };
 }
 
@@ -62,16 +46,31 @@ export function createGetSignUpUrl(authKitInstance: AuthKitInstance) {
  */
 export function createSignOut(authKitInstance: AuthKitInstance) {
   return async (event: RequestEvent) => {
-    // Use authkit-session's signOut method
-    const response = await authKitInstance.signOut(
-      event.request,
-      new Response(null, {
-        status: 302,
-        headers: {
-          Location: '/',
-        },
-      }),
-    );
+    const auth = event.locals.auth as AuthKitAuth;
+
+    if (!auth?.sessionId) {
+      // No session to sign out from, just redirect home
+      throw redirect(302, '/');
+    }
+
+    // Use authkit-session's signOut method (returns logoutUrl and clear headers)
+    const { logoutUrl, headers } = await authKitInstance.signOut(auth.sessionId);
+
+    // Create response with redirect to WorkOS logout URL
+    const response = new Response(null, {
+      status: 302,
+      headers: {
+        Location: logoutUrl,
+      },
+    });
+
+    // Apply session clear headers
+    if (headers) {
+      Object.entries(headers).forEach(([key, value]) => {
+        const headerValue = Array.isArray(value) ? value.join(', ') : value;
+        response.headers.set(key, headerValue);
+      });
+    }
 
     return response;
   };
@@ -82,17 +81,35 @@ export function createSignOut(authKitInstance: AuthKitInstance) {
  */
 export function createSwitchOrganization(authKitInstance: AuthKitInstance) {
   return async (event: RequestEvent, { organizationId }: { organizationId: string }) => {
-    const auth = event.locals.auth as AuthKitAuth;
+    // Get the current session
+    const session = await authKitInstance.getSession(event.request);
 
-    if (!auth?.user) {
+    if (!session) {
       throw new Error('User must be authenticated to switch organizations');
     }
 
-    // Use the authkit-session switchToOrganization method
-    const response = await authKitInstance.switchToOrganization(event.request, new Response(), organizationId);
+    // Use authkit-session's switchOrganization method
+    const { encryptedSession } = await authKitInstance.switchOrganization(session, organizationId);
 
-    // Redirect to refresh the page with new organization context
-    throw redirect(302, event.url.pathname);
+    // Save the new session and redirect
+    const { headers } = await authKitInstance.saveSession(undefined, encryptedSession);
+
+    // Create response with redirect and session headers
+    const response = new Response(null, {
+      status: 302,
+      headers: {
+        Location: event.url.pathname,
+      },
+    });
+
+    if (headers) {
+      Object.entries(headers).forEach(([key, value]) => {
+        const headerValue = Array.isArray(value) ? value.join(', ') : value;
+        response.headers.set(key, headerValue);
+      });
+    }
+
+    return response;
   };
 }
 
@@ -132,10 +149,18 @@ export function createHandleCallback(authKitInstance: AuthKitInstance) {
           },
         });
 
-        // Copy headers from the result response (which includes the session cookie)
-        result.response.headers.forEach((value: string, key: string) => {
-          response.headers.set(key, value);
-        });
+        // Apply session headers (may come from response object or headers bag)
+        if (result.response) {
+          result.response.headers.forEach((value: string, key: string) => {
+            response.headers.set(key, value);
+          });
+        }
+        if (result.headers) {
+          Object.entries(result.headers).forEach(([key, value]) => {
+            const headerValue = Array.isArray(value) ? value.join(', ') : value;
+            response.headers.set(key, headerValue);
+          });
+        }
 
         return response;
       } catch (err) {
