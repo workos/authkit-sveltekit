@@ -141,11 +141,20 @@ export function createHandleCallback(authKitInstance: AuthKitInstance) {
           state,
         });
 
-        // Create response with redirect to the return path
+        // Prevent open redirects (CWE-601): `result.returnPathname` was decoded
+        // from the OAuth `state` parameter and is attacker-influenceable. Parse
+        // it against a throwaway origin so the WHATWG URL parser strips any
+        // host, scheme, backslash trick, or tab/newline smuggle; then emit a
+        // RELATIVE Location so the browser resolves against the public callback
+        // URL (correct behind proxies that don't reconstruct `event.url`'s
+        // origin). The leading-slash normalization prevents a crafted pathname
+        // like `//evil.com` from being served as a protocol-relative redirect.
+        const parsedReturn = new URL(result.returnPathname || '/', 'https://placeholder.invalid');
+        const safePath = '/' + parsedReturn.pathname.replace(/^\/+/, '');
         const response = new Response(null, {
           status: 302,
           headers: {
-            Location: result.returnPathname,
+            Location: `${safePath}${parsedReturn.search}${parsedReturn.hash}`,
           },
         });
 
