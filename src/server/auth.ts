@@ -141,17 +141,15 @@ export function createHandleCallback(authKitInstance: AuthKitInstance) {
           state,
         });
 
-        // `result.returnPathname` is decoded from the OAuth `state` parameter
-        // and is attacker-influenceable (CWE-601). Parse against a throwaway
-        // origin to strip any smuggled host/scheme, then emit a RELATIVE
-        // Location so the browser resolves against the public callback URL —
-        // correct behind proxies that don't reconstruct `event.url`'s origin.
-        const parsedReturn = new URL(result.returnPathname || '/', 'https://placeholder.invalid');
-        const safePath = '/' + parsedReturn.pathname.replace(/^\/+/, '');
+        // authkit-session guarantees `returnPathname` is a safe same-origin
+        // relative path (CWE-601 protection lives at the library boundary,
+        // see @workos/authkit-session >= 0.3.5). Emitting it as-is keeps the
+        // Location relative, which is also the correct behavior behind
+        // proxies that don't reconstruct `event.url`'s origin.
         const response = new Response(null, {
           status: 302,
           headers: {
-            Location: `${safePath}${parsedReturn.search}${parsedReturn.hash}`,
+            Location: result.returnPathname,
           },
         });
 

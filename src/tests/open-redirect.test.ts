@@ -23,35 +23,25 @@ async function runCallback(returnPathname: string, callbackUrl: string = CALLBAC
   return handler(event);
 }
 
-describe('handleCallback open-redirect protection (CWE-601)', () => {
-  it.each([
-    ['absolute URL to evil host', 'https://evil.com/steal'],
-    ['protocol-relative URL', '//evil.com/steal'],
-    ['backslash smuggle', '/\\evil.com/path'],
-    ['javascript: scheme', 'javascript:alert(1)'],
-    ['empty string', ''],
-    ['tab smuggling', '/\tevil.com'],
-    ['newline smuggling', '/\nevil.com'],
-  ])('keeps %s on the trusted origin', async (_desc, returnPathname) => {
-    const response = await runCallback(returnPathname);
-    const location = response.headers.get('Location')!;
-    const resolved = new URL(location, TRUSTED_ORIGIN);
-    expect(resolved.origin).toBe(TRUSTED_ORIGIN);
-  });
-
-  it('preserves legitimate pathname + query', async () => {
+// CWE-601 sanitization lives in @workos/authkit-session >= 0.3.5; this SDK
+// trusts that `returnPathname` is already a safe same-origin relative path
+// and echoes it into the Location header. These tests verify the SDK's half
+// of that contract: faithful passthrough + no accidental origin smuggling.
+describe('handleCallback Location header', () => {
+  it('echoes the sanitized returnPathname verbatim', async () => {
     const response = await runCallback('/dashboard?tab=settings');
     expect(response.headers.get('Location')).toBe('/dashboard?tab=settings');
   });
 
-  it('preserves hash fragments', async () => {
+  it('preserves hash fragments for client-side routing / anchors', async () => {
     const response = await runCallback('/dashboard#billing');
     expect(response.headers.get('Location')).toBe('/dashboard#billing');
   });
 
-  it('emits a relative Location (safe behind proxies that do not rewrite event.url)', async () => {
-    // Simulate a proxied request where event.url carries an internal backend
-    // origin rather than the public one — the Location must not leak it.
+  it('never attaches the request origin to the Location (proxy-safe)', async () => {
+    // Regression guard: behind a proxy, event.url may carry an internal
+    // backend host. The Location must stay relative so that host never
+    // leaks into the redirect.
     const response = await runCallback('/dashboard', 'http://internal-backend.local:3000/auth/callback?code=a&state=b');
     const location = response.headers.get('Location')!;
     expect(location).toBe('/dashboard');
