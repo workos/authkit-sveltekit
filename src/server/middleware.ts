@@ -2,6 +2,7 @@ import type { RequestEvent } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import type { createAuthService } from '@workos/authkit-session';
 import type { AuthenticatedHandler, AuthKitAuth } from '../types.js';
+import { setPKCECookie } from './adapters/pkce-cookies.js';
 
 type AuthKitInstance = ReturnType<typeof createAuthService<Request, Response>>;
 
@@ -17,13 +18,15 @@ export function createWithAuth(authKitInstance: AuthKitInstance) {
 
       // Check if user is authenticated
       if (!auth?.user) {
-        // Get the sign-in URL with return path
-        const signInUrl = await authKitInstance.getSignInUrl({
+        // Mint the sign-in URL AND its PKCE verifier cookie in one pass so
+        // the redirect carries the cookie that binds the OAuth `state`.
+        const result = await authKitInstance.getSignInUrl({
           returnPathname: event.url.pathname,
         });
+        setPKCECookie(event.cookies, result);
 
         // Redirect to sign-in
-        throw redirect(302, signInUrl);
+        throw redirect(302, result.url);
       }
 
       // User is authenticated, call the handler with auth context

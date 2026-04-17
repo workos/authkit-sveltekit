@@ -1,7 +1,9 @@
 import type { RequestEvent } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import type { createAuthService } from '@workos/authkit-session';
+import { OAuthStateMismatchError, PKCECookieMissingError, SessionEncryptionError } from '@workos/authkit-session';
 import type { SignInOptions, AuthKitAuth } from '../types.js';
+import { deletePKCECookie, setPKCECookie } from './adapters/pkce-cookies.js';
 
 type AuthKitInstance = ReturnType<typeof createAuthService<Request, Response>>;
 
@@ -16,28 +18,40 @@ export function createGetUser(_authKitInstance: AuthKitInstance) {
 }
 
 /**
- * Create getSignInUrl helper
+ * Create getSignInUrl helper.
+ *
+ * The SvelteKit `RequestEvent` is required so this function can set the
+ * PKCE verifier cookie on `event.cookies` before the caller redirects. The
+ * cookie binds the returned OAuth `state` parameter to the subsequent
+ * callback — sending the URL without the cookie will produce a
+ * `PKCECookieMissingError` on return.
  */
 export function createGetSignInUrl(authKitInstance: AuthKitInstance) {
-  return async (options?: SignInOptions) => {
-    return authKitInstance.getSignInUrl({
+  return async (event: RequestEvent, options?: SignInOptions): Promise<string> => {
+    const result = await authKitInstance.getSignInUrl({
       returnPathname: options?.returnTo,
       organizationId: options?.organizationId,
       loginHint: options?.loginHint,
     });
+    setPKCECookie(event.cookies, result);
+    return result.url;
   };
 }
 
 /**
- * Create getSignUpUrl helper
+ * Create getSignUpUrl helper.
+ *
+ * See `createGetSignInUrl` for the cookie contract — identical here.
  */
 export function createGetSignUpUrl(authKitInstance: AuthKitInstance) {
-  return async (options?: SignInOptions) => {
-    return authKitInstance.getSignUpUrl({
+  return async (event: RequestEvent, options?: SignInOptions): Promise<string> => {
+    const result = await authKitInstance.getSignUpUrl({
       returnPathname: options?.returnTo,
       organizationId: options?.organizationId,
       loginHint: options?.loginHint,
     });
+    setPKCECookie(event.cookies, result);
+    return result.url;
   };
 }
 
@@ -114,34 +128,54 @@ export function createSwitchOrganization(authKitInstance: AuthKitInstance) {
 }
 
 /**
- * Create handleCallback helper for OAuth callback
+ * Create handleCallback helper for OAuth callback.
+ *
+ * Reads the PKCE verifier cookie from the request, passes it to
+ * `authkit-session` so the sealed state can be byte-compared before
+ * decryption, and deletes the cookie on EVERY exit path (success,
+ * OAuth-provider error, state mismatch, missing cookie, encryption
+ * failure) so a stuck verifier never bleeds into the next sign-in.
  */
 export function createHandleCallback(authKitInstance: AuthKitInstance) {
   return () => {
-    return async ({ url }: RequestEvent) => {
+    return async (event: RequestEvent): Promise<Response> => {
+      const { url, cookies } = event;
       const code = url.searchParams.get('code');
       const state = url.searchParams.get('state') || undefined;
-      const error = url.searchParams.get('error');
+      const oauthError = url.searchParams.get('error');
+      const cookieOptions = authKitInstance.getPKCECookieOptions();
 
-      // Handle OAuth errors
-      if (error) {
-        console.error('OAuth error:', error);
-        const errorCode = error === 'access_denied' ? 'ACCESS_DENIED' : 'AUTH_ERROR';
-        throw redirect(302, `/auth/error?code=${errorCode}`);
+      function bail(errCode: string, status: 302 | 303 | 307 | 308 = 302): never {
+        deletePKCECookie(cookies, cookieOptions);
+        redirect(status, `/auth/error?code=${errCode}`);
+      }
+
+      if (oauthError) {
+        console.error('OAuth error:', oauthError);
+        bail(oauthError === 'access_denied' ? 'ACCESS_DENIED' : 'AUTH_ERROR');
       }
 
       if (!code) {
-        throw new Error('Missing authorization code');
+        bail('AUTH_FAILED');
       }
 
+      const cookieValue = cookies.get(cookieOptions.name);
+
       try {
-        // Use authkit-session's handleCallback
         const result = await authKitInstance.handleCallback(new Request(url.toString()), new Response(), {
           code,
           state,
+          cookieValue,
         });
 
-        // Create response with redirect to the return path
+        // Single-use by design — delete the verifier on success too.
+        deletePKCECookie(cookies, cookieOptions);
+
+        // authkit-session guarantees `returnPathname` is a safe same-origin
+        // relative path (CWE-601 protection lives at the library boundary,
+        // see @workos/authkit-session). Emitting it as-is keeps the
+        // Location relative, which is also the correct behavior behind
+        // proxies that don't reconstruct `event.url`'s origin.
         const response = new Response(null, {
           status: 302,
           headers: {
@@ -149,7 +183,6 @@ export function createHandleCallback(authKitInstance: AuthKitInstance) {
           },
         });
 
-        // Apply session headers (may come from response object or headers bag)
         if (result.response) {
           result.response.headers.forEach((value: string, key: string) => {
             response.headers.set(key, value);
@@ -165,7 +198,15 @@ export function createHandleCallback(authKitInstance: AuthKitInstance) {
         return response;
       } catch (err) {
         console.error('Authentication error:', err);
-        throw redirect(302, '/auth/error?code=AUTH_FAILED');
+        const errCode =
+          err instanceof OAuthStateMismatchError
+            ? 'STATE_MISMATCH'
+            : err instanceof PKCECookieMissingError
+              ? 'PKCE_COOKIE_MISSING'
+              : err instanceof SessionEncryptionError
+                ? 'SESSION_ENCRYPTION_FAILED'
+                : 'AUTH_FAILED';
+        bail(errCode);
       }
     };
   };
@@ -175,8 +216,8 @@ export function createHandleCallback(authKitInstance: AuthKitInstance) {
  * Create refreshSession helper
  * Note: Session refresh is handled automatically by authkit-session
  */
-export function createRefreshSession(authKitInstance: AuthKitInstance) {
-  return async (event: RequestEvent) => {
+export function createRefreshSession(_authKitInstance: AuthKitInstance) {
+  return async (_event: RequestEvent) => {
     // Session refresh is handled automatically by withAuth
     // This is a no-op but kept for API compatibility
     return true;

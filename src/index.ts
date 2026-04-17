@@ -20,6 +20,16 @@ type AuthKitInstance = ReturnType<typeof createAuthService<Request, Response>>;
 export type { AuthKitAuth, AuthKitConfig } from './types.js';
 // Re-export all types from authkit-session that users might need
 export type * from '@workos/authkit-session';
+// Re-export typed OAuth callback errors so adapters of this SDK can
+// distinguish state/cookie/encryption failures at the catch site.
+export {
+  AuthKitError,
+  OAuthStateMismatchError,
+  PKCECookieMissingError,
+  SessionEncryptionError,
+  TokenRefreshError,
+  TokenValidationError,
+} from '@workos/authkit-session';
 
 // Lazy initialization variables
 let authKitInstance: AuthKitInstance | null = null;
@@ -114,8 +124,19 @@ export function configureAuthKit(config: AuthKitConfig): void {
 export const authKit = {
   withAuth: <T>(handler: AuthenticatedHandler<T>) => createWithAuth(getAuthKitInstance())(handler),
   getUser: (event: RequestEvent) => createGetUser(getAuthKitInstance())(event),
-  getSignInUrl: async (options?: SignInOptions) => createGetSignInUrl(getAuthKitInstance())(options),
-  getSignUpUrl: async (options?: SignInOptions) => createGetSignUpUrl(getAuthKitInstance())(options),
+  /**
+   * Mint a sign-in URL AND set the PKCE verifier cookie on `event.cookies`
+   * in a single call. The cookie binds the OAuth `state` parameter to the
+   * subsequent callback — see `handleCallback`.
+   */
+  getSignInUrl: (event: RequestEvent, options?: SignInOptions) =>
+    createGetSignInUrl(getAuthKitInstance())(event, options),
+  /**
+   * Mint a sign-up URL AND set the PKCE verifier cookie. See
+   * `getSignInUrl`.
+   */
+  getSignUpUrl: (event: RequestEvent, options?: SignInOptions) =>
+    createGetSignUpUrl(getAuthKitInstance())(event, options),
   signOut: (event: RequestEvent) => createSignOut(getAuthKitInstance())(event),
   switchOrganization: (event: RequestEvent, options: { organizationId: string }) =>
     createSwitchOrganization(getAuthKitInstance())(event, options),
