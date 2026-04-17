@@ -4,6 +4,7 @@ import type { createAuthService } from '@workos/authkit-session';
 import { OAuthStateMismatchError, PKCECookieMissingError, SessionEncryptionError } from '@workos/authkit-session';
 import type { SignInOptions, AuthKitAuth } from '../types.js';
 import { deletePKCECookie, setPKCECookie } from './adapters/pkce-cookies.js';
+import { getRequestEvent } from './adapters/request-context.js';
 
 type AuthKitInstance = ReturnType<typeof createAuthService<Request, Response>>;
 
@@ -20,14 +21,16 @@ export function createGetUser(_authKitInstance: AuthKitInstance) {
 /**
  * Create getSignInUrl helper.
  *
- * The SvelteKit `RequestEvent` is required so this function can set the
- * PKCE verifier cookie on `event.cookies` before the caller redirects. The
- * cookie binds the returned OAuth `state` parameter to the subsequent
- * callback — sending the URL without the cookie will produce a
- * `PKCECookieMissingError` on return.
+ * Reads the current `RequestEvent` from the per-request
+ * `AsyncLocalStorage` populated by `authKitHandle`, so this function can
+ * set the PKCE verifier cookie on `event.cookies` without requiring the
+ * caller to pass `event` explicitly. The cookie binds the returned OAuth
+ * `state` parameter to the subsequent callback — sending the URL without
+ * the cookie will produce a `PKCECookieMissingError` on return.
  */
 export function createGetSignInUrl(authKitInstance: AuthKitInstance) {
-  return async (event: RequestEvent, options?: SignInOptions): Promise<string> => {
+  return async (options?: SignInOptions): Promise<string> => {
+    const event = getRequestEvent();
     const result = await authKitInstance.getSignInUrl({
       returnPathname: options?.returnTo,
       organizationId: options?.organizationId,
@@ -44,7 +47,8 @@ export function createGetSignInUrl(authKitInstance: AuthKitInstance) {
  * See `createGetSignInUrl` for the cookie contract — identical here.
  */
 export function createGetSignUpUrl(authKitInstance: AuthKitInstance) {
-  return async (event: RequestEvent, options?: SignInOptions): Promise<string> => {
+  return async (options?: SignInOptions): Promise<string> => {
+    const event = getRequestEvent();
     const result = await authKitInstance.getSignUpUrl({
       returnPathname: options?.returnTo,
       organizationId: options?.organizationId,

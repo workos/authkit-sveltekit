@@ -125,18 +125,19 @@ export const authKit = {
   withAuth: <T>(handler: AuthenticatedHandler<T>) => createWithAuth(getAuthKitInstance())(handler),
   getUser: (event: RequestEvent) => createGetUser(getAuthKitInstance())(event),
   /**
-   * Mint a sign-in URL AND set the PKCE verifier cookie on `event.cookies`
-   * in a single call. The cookie binds the OAuth `state` parameter to the
-   * subsequent callback — see `handleCallback`.
+   * Mint a sign-in URL AND set the PKCE verifier cookie on the current
+   * request's cookies. Must be called inside a SvelteKit request whose
+   * `RequestEvent` is reachable via `authKitHandle()` — the hook
+   * populates an `AsyncLocalStorage` slot the helper reads from. The
+   * cookie binds the OAuth `state` parameter to the subsequent
+   * callback — see `handleCallback`.
    */
-  getSignInUrl: (event: RequestEvent, options?: SignInOptions) =>
-    createGetSignInUrl(getAuthKitInstance())(event, options),
+  getSignInUrl: (options?: SignInOptions) => createGetSignInUrl(getAuthKitInstance())(options),
   /**
    * Mint a sign-up URL AND set the PKCE verifier cookie. See
-   * `getSignInUrl`.
+   * `getSignInUrl` for the request-context requirement.
    */
-  getSignUpUrl: (event: RequestEvent, options?: SignInOptions) =>
-    createGetSignUpUrl(getAuthKitInstance())(event, options),
+  getSignUpUrl: (options?: SignInOptions) => createGetSignUpUrl(getAuthKitInstance())(options),
   signOut: (event: RequestEvent) => createSignOut(getAuthKitInstance())(event),
   switchOrganization: (event: RequestEvent, options: { organizationId: string }) =>
     createSwitchOrganization(getAuthKitInstance())(event, options),

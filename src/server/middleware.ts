@@ -18,8 +18,10 @@ export function createWithAuth(authKitInstance: AuthKitInstance) {
 
       // Check if user is authenticated
       if (!auth?.user) {
-        // Mint the sign-in URL AND its PKCE verifier cookie in one pass so
-        // the redirect carries the cookie that binds the OAuth `state`.
+        // Mint the sign-in URL AND its PKCE verifier cookie in one pass
+        // so the redirect carries the cookie that binds the OAuth
+        // `state`. Uses `event` directly (already in hand) instead of
+        // the async-local store — functionally equivalent.
         const result = await authKitInstance.getSignInUrl({
           returnPathname: event.url.pathname,
         });
