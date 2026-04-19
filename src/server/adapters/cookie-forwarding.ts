@@ -1,4 +1,4 @@
-import type { Cookies, RequestEvent } from '@sveltejs/kit';
+import type { RequestEvent } from '@sveltejs/kit';
 import type { HeadersBag } from '@workos/authkit-session';
 
 /**
@@ -125,8 +125,7 @@ export function applyCookies(event: RequestEvent, mutated?: Response, headers?: 
   const setCookieValues: string[] = [];
 
   if (mutated) {
-    const multi = mutated.headers.getSetCookie?.() ?? [];
-    setCookieValues.push(...multi);
+    setCookieValues.push(...mutated.headers.getSetCookie());
   }
 
   if (headers) {
@@ -137,8 +136,11 @@ export function applyCookies(event: RequestEvent, mutated?: Response, headers?: 
 
   for (const raw of setCookieValues) {
     const parsed = parseSetCookieHeader(raw);
+    // SvelteKit's `Cookies.set` requires `path: string`. authkit-session always
+    // emits a Path attribute (see CookieSessionStorage.serializeCookie); the cast
+    // reflects that invariant without polluting `ParsedCookieOptions`.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (event.cookies as Cookies).set(parsed.name, parsed.value, parsed.options as any);
+    event.cookies.set(parsed.name, parsed.value, parsed.options as any);
   }
 }
 
