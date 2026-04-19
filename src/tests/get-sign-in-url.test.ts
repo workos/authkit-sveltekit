@@ -21,19 +21,14 @@ function mockCookies() {
   return { cookies, setCalls };
 }
 
-function makeInstance(method: 'getSignInUrl' | 'getSignUpUrl'): AuthKitInstance {
+function makeInstance(
+  method: 'createSignIn' | 'createSignUp',
+  setCookieValue = `${PKCE_COOKIE_NAME}=sealed-verifier; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600`,
+): AuthKitInstance {
   return {
     [method]: vi.fn().mockResolvedValue({
       url: 'https://workos.example/authorize?state=sealed',
-      sealedState: 'sealed',
-      cookieOptions: {
-        name: PKCE_COOKIE_NAME,
-        path: '/',
-        httpOnly: true,
-        secure: true,
-        sameSite: 'lax',
-        maxAge: 600,
-      },
+      headers: { 'Set-Cookie': setCookieValue },
     }),
   } as unknown as AuthKitInstance;
 }
@@ -50,19 +45,29 @@ describe('getSignInUrl / getSignUpUrl', () => {
   it('returns the URL and sets the PKCE verifier cookie on the active request', async () => {
     const { cookies, setCalls } = mockCookies();
     const event = makeEvent(cookies);
-    const instance = makeInstance('getSignInUrl');
+    const instance = makeInstance('createSignIn');
 
     const url = await runWithRequestEvent(event, () => createGetSignInUrl(instance)({ returnTo: '/dashboard' }));
 
     expect(url).toBe('https://workos.example/authorize?state=sealed');
     expect(setCalls).toHaveLength(1);
-    expect(setCalls[0]).toMatchObject({ name: PKCE_COOKIE_NAME, value: 'sealed' });
+    expect(setCalls[0]).toMatchObject({
+      name: PKCE_COOKIE_NAME,
+      value: 'sealed-verifier',
+      opts: {
+        path: '/',
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        maxAge: 600,
+      },
+    });
   });
 
   it('sets the cookie for getSignUpUrl too', async () => {
     const { cookies, setCalls } = mockCookies();
     const event = makeEvent(cookies);
-    const instance = makeInstance('getSignUpUrl');
+    const instance = makeInstance('createSignUp');
 
     await runWithRequestEvent(event, () => createGetSignUpUrl(instance)({ returnTo: '/welcome' }));
 
@@ -71,7 +76,7 @@ describe('getSignInUrl / getSignUpUrl', () => {
   });
 
   it('throws a clear error when called outside a request context', async () => {
-    const instance = makeInstance('getSignInUrl');
+    const instance = makeInstance('createSignIn');
 
     await expect(createGetSignInUrl(instance)()).rejects.toThrow(/No active request context/);
   });

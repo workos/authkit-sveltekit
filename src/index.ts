@@ -129,13 +129,16 @@ export const authKit = {
    * request's cookies. Must be called inside a SvelteKit request whose
    * `RequestEvent` is reachable via `authKitHandle()` — the hook
    * populates an `AsyncLocalStorage` slot the helper reads from. The
-   * cookie binds the OAuth `state` parameter to the subsequent
-   * callback — see `handleCallback`.
+   * verifier cookie is owned by `@workos/authkit-session`'s storage
+   * layer; this adapter forwards the resulting `Set-Cookie` headers
+   * onto `event.cookies`. The cookie binds the OAuth `state` parameter
+   * to the subsequent callback — see `handleCallback`.
    */
   getSignInUrl: (options?: SignInOptions) => createGetSignInUrl(getAuthKitInstance())(options),
   /**
    * Mint a sign-up URL AND set the PKCE verifier cookie. See
-   * `getSignInUrl` for the request-context requirement.
+   * `getSignInUrl` for the request-context and cookie-ownership
+   * contract.
    */
   getSignUpUrl: (options?: SignInOptions) => createGetSignUpUrl(getAuthKitInstance())(options),
   signOut: (event: RequestEvent) => createSignOut(getAuthKitInstance())(event),

@@ -3,7 +3,7 @@ import { redirect } from '@sveltejs/kit';
 import type { createAuthService } from '@workos/authkit-session';
 import { OAuthStateMismatchError, PKCECookieMissingError, SessionEncryptionError } from '@workos/authkit-session';
 import type { SignInOptions, AuthKitAuth } from '../types.js';
-import { deletePKCECookie, setPKCECookie } from './adapters/pkce-cookies.js';
+import { applyCookies, appendHeaderBag } from './adapters/cookie-forwarding.js';
 import { getRequestEvent } from './adapters/request-context.js';
 
 type AuthKitInstance = ReturnType<typeof createAuthService<Request, Response>>;
@@ -22,22 +22,26 @@ export function createGetUser(_authKitInstance: AuthKitInstance) {
  * Create getSignInUrl helper.
  *
  * Reads the current `RequestEvent` from the per-request
- * `AsyncLocalStorage` populated by `authKitHandle`, so this function can
- * set the PKCE verifier cookie on `event.cookies` without requiring the
- * caller to pass `event` explicitly. The cookie binds the returned OAuth
- * `state` parameter to the subsequent callback — sending the URL without
- * the cookie will produce a `PKCECookieMissingError` on return.
+ * `AsyncLocalStorage` populated by `authKitHandle`, so this function
+ * can set the PKCE verifier cookie on `event.cookies` without requiring
+ * the caller to pass `event` explicitly. The cookie binds the returned
+ * OAuth `state` parameter to the subsequent callback — sending the URL
+ * without the cookie will produce a `PKCECookieMissingError` on return.
  */
 export function createGetSignInUrl(authKitInstance: AuthKitInstance) {
   return async (options?: SignInOptions): Promise<string> => {
     const event = getRequestEvent();
-    const result = await authKitInstance.getSignInUrl({
+    const {
+      url,
+      response: mutated,
+      headers,
+    } = await authKitInstance.createSignIn(new Response(), {
       returnPathname: options?.returnTo,
       organizationId: options?.organizationId,
       loginHint: options?.loginHint,
     });
-    setPKCECookie(event.cookies, result);
-    return result.url;
+    applyCookies(event, mutated, headers);
+    return url;
   };
 }
 
@@ -49,13 +53,17 @@ export function createGetSignInUrl(authKitInstance: AuthKitInstance) {
 export function createGetSignUpUrl(authKitInstance: AuthKitInstance) {
   return async (options?: SignInOptions): Promise<string> => {
     const event = getRequestEvent();
-    const result = await authKitInstance.getSignUpUrl({
+    const {
+      url,
+      response: mutated,
+      headers,
+    } = await authKitInstance.createSignUp(new Response(), {
       returnPathname: options?.returnTo,
       organizationId: options?.organizationId,
       loginHint: options?.loginHint,
     });
-    setPKCECookie(event.cookies, result);
-    return result.url;
+    applyCookies(event, mutated, headers);
+    return url;
   };
 }
 
@@ -82,13 +90,9 @@ export function createSignOut(authKitInstance: AuthKitInstance) {
       },
     });
 
-    // Apply session clear headers
-    if (headers) {
-      Object.entries(headers).forEach(([key, value]) => {
-        const headerValue = Array.isArray(value) ? value.join(', ') : value;
-        response.headers.set(key, headerValue);
-      });
-    }
+    // Apply session clear headers — must append every Set-Cookie entry
+    // individually, never comma-join (not a valid single HTTP header).
+    appendHeaderBag(response.headers, headers);
 
     return response;
   };
@@ -120,12 +124,9 @@ export function createSwitchOrganization(authKitInstance: AuthKitInstance) {
       },
     });
 
-    if (headers) {
-      Object.entries(headers).forEach(([key, value]) => {
-        const headerValue = Array.isArray(value) ? value.join(', ') : value;
-        response.headers.set(key, headerValue);
-      });
-    }
+    // Apply session headers — must append every Set-Cookie entry
+    // individually, never comma-join (not a valid single HTTP header).
+    appendHeaderBag(response.headers, headers);
 
     return response;
   };
@@ -134,46 +135,51 @@ export function createSwitchOrganization(authKitInstance: AuthKitInstance) {
 /**
  * Create handleCallback helper for OAuth callback.
  *
- * Reads the PKCE verifier cookie from the request, passes it to
+ * Reads the PKCE verifier cookie via the storage adapter, passes it to
  * `authkit-session` so the sealed state can be byte-compared before
- * decryption, and deletes the cookie on EVERY exit path (success,
+ * decryption, and clears the cookie on EVERY exit path (success,
  * OAuth-provider error, state mismatch, missing cookie, encryption
  * failure) so a stuck verifier never bleeds into the next sign-in.
+ *
+ * The returned `Response` is constructed manually (not via SvelteKit's
+ * throwing `redirect()`) so `Set-Cookie` headers for the verifier
+ * delete attach cleanly to the redirect itself.
  */
 export function createHandleCallback(authKitInstance: AuthKitInstance) {
   return () => {
     return async (event: RequestEvent): Promise<Response> => {
-      const { url, cookies } = event;
+      const { url, request } = event;
       const code = url.searchParams.get('code');
       const state = url.searchParams.get('state') || undefined;
       const oauthError = url.searchParams.get('error');
-      const cookieOptions = authKitInstance.getPKCECookieOptions();
 
-      function bail(errCode: string, status: 302 | 303 | 307 | 308 = 302): never {
-        deletePKCECookie(cookies, cookieOptions);
-        redirect(status, `/auth/error?code=${errCode}`);
-      }
+      // Build an error-redirect Response carrying `clearPendingVerifier`'s
+      // Set-Cookie. Using a manual Response instead of `redirect()` keeps
+      // the verifier-delete attached to this exact response.
+      const bail = async (errCode: string, status: 302 | 303 | 307 | 308 = 302): Promise<Response> => {
+        const { headers: deleteHeaders } = await authKitInstance.clearPendingVerifier(new Response());
+        const response = new Response(null, {
+          status,
+          headers: { Location: `/auth/error?code=${errCode}` },
+        });
+        appendHeaderBag(response.headers, deleteHeaders);
+        return response;
+      };
 
       if (oauthError) {
         console.error('OAuth error:', oauthError);
-        bail(oauthError === 'access_denied' ? 'ACCESS_DENIED' : 'AUTH_ERROR');
+        return bail(oauthError === 'access_denied' ? 'ACCESS_DENIED' : 'AUTH_ERROR');
       }
 
       if (!code) {
-        bail('AUTH_FAILED');
+        return bail('AUTH_FAILED');
       }
 
-      const cookieValue = cookies.get(cookieOptions.name);
-
       try {
-        const result = await authKitInstance.handleCallback(new Request(url.toString()), new Response(), {
+        const result = await authKitInstance.handleCallback(request, new Response(), {
           code,
           state,
-          cookieValue,
         });
-
-        // Single-use by design — delete the verifier on success too.
-        deletePKCECookie(cookies, cookieOptions);
 
         // authkit-session guarantees `returnPathname` is a safe same-origin
         // relative path (CWE-601 protection lives at the library boundary,
@@ -187,17 +193,13 @@ export function createHandleCallback(authKitInstance: AuthKitInstance) {
           },
         });
 
+        // Forward Set-Cookie headers — append each, never set-collapse.
         if (result.response) {
           result.response.headers.forEach((value: string, key: string) => {
-            response.headers.set(key, value);
+            response.headers.append(key, value);
           });
         }
-        if (result.headers) {
-          Object.entries(result.headers).forEach(([key, value]) => {
-            const headerValue = Array.isArray(value) ? value.join(', ') : value;
-            response.headers.set(key, headerValue);
-          });
-        }
+        appendHeaderBag(response.headers, result.headers);
 
         return response;
       } catch (err) {
@@ -210,7 +212,7 @@ export function createHandleCallback(authKitInstance: AuthKitInstance) {
               : err instanceof SessionEncryptionError
                 ? 'SESSION_ENCRYPTION_FAILED'
                 : 'AUTH_FAILED';
-        bail(errCode);
+        return bail(errCode);
       }
     };
   };
