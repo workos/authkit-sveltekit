@@ -36,6 +36,11 @@ describe('SvelteKitStorage.getCookie', () => {
     const value = await storage.getCookie(withHeader('wos-auth-verifier=a%20b%2Fc'), 'wos-auth-verifier');
     expect(value).toBe('a b/c');
   });
+
+  it('returns null on malformed percent-encoding (does not throw)', async () => {
+    const value = await storage.getCookie(withHeader('wos-auth-verifier=%E0%A4%A'), 'wos-auth-verifier');
+    expect(value).toBeNull();
+  });
 });
 
 describe('SvelteKitStorage.getSession (inherited)', () => {

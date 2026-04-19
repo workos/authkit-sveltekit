@@ -33,6 +33,13 @@ export class SvelteKitStorage extends CookieSessionStorage<Request, Response> {
       .map((part) => part.trim())
       .find((part) => part.startsWith(prefix));
     if (!match) return null;
-    return decodeURIComponent(match.slice(prefix.length));
+    const raw = match.slice(prefix.length);
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      // Malformed percent-encoding — surface as missing rather than
+      // letting a URIError bubble up and 500 the request.
+      return null;
+    }
   }
 }
