@@ -10,7 +10,7 @@ const CALLBACK_URL = `${TRUSTED_ORIGIN}/auth/callback?code=abc&state=xyz`;
 const PKCE_COOKIE_NAME = 'wos-auth-verifier';
 
 const VERIFIER_DELETE = `${PKCE_COOKIE_NAME}=; Path=/; Max-Age=0`;
-const SESSION_COOKIE = 'wos_session=sealed-session; Path=/; HttpOnly; Secure; SameSite=Lax';
+const SESSION_COOKIE = 'wos-session=sealed-session; Path=/; HttpOnly; Secure; SameSite=Lax';
 
 function makeInstance(overrides: Partial<AuthKitInstance> = {}): AuthKitInstance {
   return {

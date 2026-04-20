@@ -47,8 +47,8 @@ describe('SvelteKitStorage.getSession (inherited)', () => {
   const storage = new SvelteKitStorage(baseConfig);
 
   it('reads the session cookie from the request cookie header', async () => {
-    // Default cookie name is `wos_session` unless overridden in config.
-    const value = await storage.getSession(withHeader('wos_session=encrypted-session'));
+    // Default cookie name is `wos-session` unless overridden in config.
+    const value = await storage.getSession(withHeader('wos-session=encrypted-session'));
     expect(value).toBe('encrypted-session');
   });
 
