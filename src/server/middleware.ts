@@ -16,22 +16,14 @@ export function createWithAuth(authKitInstance: AuthKitInstance) {
       // Get auth from locals (populated by the handle hook)
       const auth = event.locals.auth as AuthKitAuth;
 
-      // Check if user is authenticated
       if (!auth?.user) {
-        // Mint the sign-in URL AND its PKCE verifier cookie in one pass
-        // so the redirect carries the cookie that binds the OAuth
-        // `state`. Cookies applied here are folded into the response
-        // that SvelteKit emits for the thrown redirect.
-        const {
-          url,
-          response: mutated,
-          headers,
-        } = await authKitInstance.createSignIn(new Response(), {
+        // Mint sign-in URL + verifier cookie together so the redirect
+        // SvelteKit emits for the thrown `redirect(302, url)` already
+        // carries the cookie that binds the OAuth `state`.
+        const { url, response, headers } = await authKitInstance.createSignIn(new Response(), {
           returnPathname: event.url.pathname,
         });
-        applyCookies(event, mutated, headers);
-
-        // Redirect to sign-in
+        applyCookies(event, response, headers);
         throw redirect(302, url);
       }
 

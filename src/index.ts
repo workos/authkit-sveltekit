@@ -16,12 +16,10 @@ import type { AuthKitConfig, AuthKitHandleOptions, AuthenticatedHandler, SignInO
 
 type AuthKitInstance = ReturnType<typeof createAuthService<Request, Response>>;
 
-// Re-export types
 export type { AuthKitAuth, AuthKitConfig } from './types.js';
-// Re-export all types from authkit-session that users might need
 export type * from '@workos/authkit-session';
-// Re-export typed OAuth callback errors so adapters of this SDK can
-// distinguish state/cookie/encryption failures at the catch site.
+// Typed OAuth callback errors — re-exported so callers can distinguish
+// state/cookie/encryption failures at the catch site.
 export {
   AuthKitError,
   OAuthStateMismatchError,
@@ -124,22 +122,10 @@ export function configureAuthKit(config: AuthKitConfig): void {
 export const authKit = {
   withAuth: <T>(handler: AuthenticatedHandler<T>) => createWithAuth(getAuthKitInstance())(handler),
   getUser: (event: RequestEvent) => createGetUser(getAuthKitInstance())(event),
-  /**
-   * Mint a sign-in URL AND set the PKCE verifier cookie on the current
-   * request's cookies. Must be called inside a SvelteKit request whose
-   * `RequestEvent` is reachable via `authKitHandle()` — the hook
-   * populates an `AsyncLocalStorage` slot the helper reads from. The
-   * verifier cookie is owned by `@workos/authkit-session`'s storage
-   * layer; this adapter forwards the resulting `Set-Cookie` headers
-   * onto `event.cookies`. The cookie binds the OAuth `state` parameter
-   * to the subsequent callback — see `handleCallback`.
-   */
+  // Mint a sign-in/up URL and set the PKCE verifier cookie on the active
+  // RequestEvent. Must be called inside a request registered through
+  // `authKitHandle()`. The cookie binds the OAuth `state` to the callback.
   getSignInUrl: (options?: SignInOptions) => createGetSignInUrl(getAuthKitInstance())(options),
-  /**
-   * Mint a sign-up URL AND set the PKCE verifier cookie. See
-   * `getSignInUrl` for the request-context and cookie-ownership
-   * contract.
-   */
   getSignUpUrl: (options?: SignInOptions) => createGetSignUpUrl(getAuthKitInstance())(options),
   signOut: (event: RequestEvent) => createSignOut(getAuthKitInstance())(event),
   switchOrganization: (event: RequestEvent, options: { organizationId: string }) =>

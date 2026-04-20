@@ -1,11 +1,16 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Cookies, RequestEvent } from '@sveltejs/kit';
 import { createGetSignInUrl, createGetSignUpUrl } from '../server/auth.js';
-import { runWithRequestEvent } from '../server/adapters/request-context.js';
 
 type AuthKitInstance = Parameters<typeof createGetSignInUrl>[0];
 
 const PKCE_COOKIE_NAME = 'wos-auth-verifier';
+
+const getRequestEventMock = vi.hoisted(() => vi.fn<() => RequestEvent>());
+
+vi.mock('$app/server', () => ({
+  getRequestEvent: getRequestEventMock,
+}));
 
 function mockCookies() {
   const setCalls: Array<{ name: string; value: string; opts: Record<string, unknown> }> = [];
@@ -42,12 +47,16 @@ function makeEvent(cookies: Cookies): RequestEvent {
 }
 
 describe('getSignInUrl / getSignUpUrl', () => {
+  beforeEach(() => {
+    getRequestEventMock.mockReset();
+  });
+
   it('returns the URL and sets the PKCE verifier cookie on the active request', async () => {
     const { cookies, setCalls } = mockCookies();
-    const event = makeEvent(cookies);
+    getRequestEventMock.mockReturnValue(makeEvent(cookies));
     const instance = makeInstance('createSignIn');
 
-    const url = await runWithRequestEvent(event, () => createGetSignInUrl(instance)({ returnTo: '/dashboard' }));
+    const url = await createGetSignInUrl(instance)({ returnTo: '/dashboard' });
 
     expect(url).toBe('https://workos.example/authorize?state=sealed');
     expect(setCalls).toHaveLength(1);
@@ -66,18 +75,21 @@ describe('getSignInUrl / getSignUpUrl', () => {
 
   it('sets the cookie for getSignUpUrl too', async () => {
     const { cookies, setCalls } = mockCookies();
-    const event = makeEvent(cookies);
+    getRequestEventMock.mockReturnValue(makeEvent(cookies));
     const instance = makeInstance('createSignUp');
 
-    await runWithRequestEvent(event, () => createGetSignUpUrl(instance)({ returnTo: '/welcome' }));
+    await createGetSignUpUrl(instance)({ returnTo: '/welcome' });
 
     expect(setCalls).toHaveLength(1);
     expect(setCalls[0].name).toBe(PKCE_COOKIE_NAME);
   });
 
-  it('throws a clear error when called outside a request context', async () => {
+  it('propagates the error thrown by getRequestEvent outside a request context', async () => {
+    getRequestEventMock.mockImplementation(() => {
+      throw new Error('Can only read the current request event inside ...');
+    });
     const instance = makeInstance('createSignIn');
 
-    await expect(createGetSignInUrl(instance)()).rejects.toThrow(/No active request context/);
+    await expect(createGetSignInUrl(instance)()).rejects.toThrow(/Can only read the current request event/);
   });
 });

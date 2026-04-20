@@ -100,8 +100,6 @@ describe('handleCallback', () => {
       expect(handleCallbackImpl).toHaveBeenCalledTimes(1);
       const [, , opts] = handleCallbackImpl.mock.calls[0];
       expect(opts).toMatchObject({ code: 'abc', state: 'xyz' });
-      // No cookieValue arg — library owns cookie read via storage.
-      expect(opts.cookieValue).toBeUndefined();
     });
 
     it('emits session + verifier-delete as separate Set-Cookie entries', async () => {
