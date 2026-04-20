@@ -83,7 +83,28 @@ export const GET: RequestHandler = async (event) => {
 };
 ```
 
-### 5. Protect Routes
+### 5. Create Sign-in Endpoint
+
+Create a route that initiates the AuthKit sign-in flow. This route is used as the **Sign-in endpoint** (also known as `initiate_login_uri`) in your WorkOS dashboard settings.
+
+Create `src/routes/sign-in/+server.ts`:
+
+```typescript
+import { redirect } from '@sveltejs/kit';
+import { authKit } from '@workos/authkit-sveltekit';
+import type { RequestHandler } from './$types';
+
+export const GET: RequestHandler = async () => {
+  const signInUrl = await authKit.getSignInUrl();
+  throw redirect(302, signInUrl);
+};
+```
+
+In the [WorkOS dashboard **Redirects** settings](https://dashboard.workos.com/redirects), set the **Sign-in endpoint** to match this route (e.g., `http://localhost:5173/sign-in`).
+
+> **Important**: The sign-in endpoint is required for features like [impersonation](https://workos.com/docs/user-management/impersonation) to work correctly. Without it, WorkOS-initiated flows (such as impersonating a user from the dashboard) will fail because they cannot complete the PKCE/CSRF verification this library enforces on every callback.
+
+### 6. Protect Routes
 
 In any `+page.server.ts`:
 
@@ -331,6 +352,14 @@ The SDK provides clear error messages:
 Missing required environment variables: WORKOS_CLIENT_ID, WORKOS_API_KEY
 Please add them to your .env file. See https://github.com/workos/authkit-sveltekit#setup for details.
 ```
+
+## Troubleshooting
+
+### `Missing required auth parameter` when impersonating from the WorkOS dashboard
+
+This error occurs when WorkOS-initiated flows (like dashboard impersonation) redirect directly to your callback URL without going through your application's sign-in flow. Because this library enforces PKCE/CSRF verification on every callback, the request is rejected when the required `state` parameter is missing.
+
+**Fix:** Configure a [sign-in endpoint](#5-create-sign-in-endpoint) in your WorkOS dashboard so that impersonation flows route through your app first, allowing PKCE/state to be set up before redirecting to WorkOS.
 
 ## License
 
