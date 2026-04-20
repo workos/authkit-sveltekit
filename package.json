@@ -55,8 +55,7 @@
   },
   "pnpm": {
     "overrides": {
-      "cookie": ">=0.7.0",
-      "@workos/authkit-session": "link:../authkit-session"
+      "cookie": ">=0.7.0"
     },
     "onlyBuiltDependencies": [
       "esbuild"
