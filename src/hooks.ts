@@ -3,6 +3,7 @@ import type { AuthKitHandleOptions, AuthKitAuth } from './types.js';
 import type { createAuthService, AuthResult } from '@workos/authkit-session';
 import { configureAuthKit } from './index.js';
 import { appendHeaderBag } from './server/adapters/cookie-forwarding.js';
+import { runWithRequestEvent } from './server/adapters/request-context.js';
 
 type AuthKitInstance = ReturnType<typeof createAuthService<Request, Response>>;
 
@@ -44,45 +45,47 @@ export function createAuthKitHandle(authKitInstance: AuthKitInstance): (options?
       configureAuthKit(config);
     }
 
-    // Internal helpers (getSignInUrl, getSignUpUrl) read the current
-    // RequestEvent via `getRequestEvent()` from `$app/server`; SvelteKit's
-    // own AsyncLocalStorage wraps the entire handle chain, so no additional
-    // request-context store is needed here.
-    return async ({ event, resolve }) => {
-      try {
-        if (debug) {
-          console.log('[AuthKit] Processing request:', event.url.pathname);
+    // Wrap the handle body in the per-request store so internal helpers
+    // (getSignInUrl, getSignUpUrl) can read the current `RequestEvent` via
+    // `getRequestEvent()` without the public API threading `event` through
+    // every call site. Store is scoped to this request; subsequent hooks and
+    // the final resolve() all see the same event.
+    return async ({ event, resolve }) =>
+      runWithRequestEvent(event, async () => {
+        try {
+          if (debug) {
+            console.log('[AuthKit] Processing request:', event.url.pathname);
+          }
+
+          const { auth: authResult, refreshedSessionData } = await authKitInstance.withAuth(event.request);
+
+          event.locals.auth = createAuthKitAuth(authResult);
+
+          if (debug && authResult.user) {
+            console.log('[AuthKit] User authenticated:', authResult.user.email);
+          }
+
+          const response = await resolve(event);
+
+          if (refreshedSessionData) {
+            const { headers } = await authKitInstance.saveSession(undefined, refreshedSessionData);
+            appendHeaderBag(response.headers, headers);
+          }
+
+          return response;
+        } catch (error) {
+          if (debug) {
+            console.error('[AuthKit] Error in handle:', error);
+          }
+
+          if (onError) {
+            onError(error as Error);
+          }
+
+          event.locals.auth = createEmptyAuth();
+
+          return resolve(event);
         }
-
-        const { auth: authResult, refreshedSessionData } = await authKitInstance.withAuth(event.request);
-
-        event.locals.auth = createAuthKitAuth(authResult);
-
-        if (debug && authResult.user) {
-          console.log('[AuthKit] User authenticated:', authResult.user.email);
-        }
-
-        const response = await resolve(event);
-
-        if (refreshedSessionData) {
-          const { headers } = await authKitInstance.saveSession(undefined, refreshedSessionData);
-          appendHeaderBag(response.headers, headers);
-        }
-
-        return response;
-      } catch (error) {
-        if (debug) {
-          console.error('[AuthKit] Error in handle:', error);
-        }
-
-        if (onError) {
-          onError(error as Error);
-        }
-
-        event.locals.auth = createEmptyAuth();
-
-        return resolve(event);
-      }
-    };
+      });
   };
 }

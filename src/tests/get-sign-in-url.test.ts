@@ -8,7 +8,7 @@ const PKCE_COOKIE_NAME = 'wos-auth-verifier';
 
 const getRequestEventMock = vi.hoisted(() => vi.fn<() => RequestEvent>());
 
-vi.mock('$app/server', () => ({
+vi.mock('../server/adapters/request-context.js', () => ({
   getRequestEvent: getRequestEventMock,
 }));
 

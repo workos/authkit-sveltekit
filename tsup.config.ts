@@ -8,8 +8,5 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   treeshake: true,
-  // `$app/server` is a SvelteKit-resolved virtual module in the consumer's
-  // Vite build — keep it external, don't try to bundle it.
-  external: ['$app/server'],
   noExternal: ['@workos/authkit-session', 'cookie'],
 });

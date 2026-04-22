@@ -3,8 +3,8 @@ import { redirect } from '@sveltejs/kit';
 import type { createAuthService } from '@workos/authkit-session';
 import { OAuthStateMismatchError, PKCECookieMissingError, SessionEncryptionError } from '@workos/authkit-session';
 import type { SignInOptions, AuthKitAuth } from '../types.js';
-import { getRequestEvent } from '$app/server';
 import { applyCookies, appendHeaderBag } from './adapters/cookie-forwarding.js';
+import { getRequestEvent } from './adapters/request-context.js';
 
 type AuthKitInstance = ReturnType<typeof createAuthService<Request, Response>>;
 
