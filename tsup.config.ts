@@ -8,5 +8,8 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   treeshake: true,
+  // Preserve the `node:` namespace in published output instead of rewriting
+  // it to a bare builtin import like `async_hooks`.
+  removeNodeProtocol: false,
   noExternal: ['@workos/authkit-session', 'cookie'],
 });

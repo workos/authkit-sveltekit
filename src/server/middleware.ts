@@ -2,6 +2,7 @@ import type { RequestEvent } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import type { createAuthService } from '@workos/authkit-session';
 import type { AuthenticatedHandler, AuthKitAuth } from '../types.js';
+import { applyCookies } from './adapters/cookie-forwarding.js';
 
 type AuthKitInstance = ReturnType<typeof createAuthService<Request, Response>>;
 
@@ -15,15 +16,15 @@ export function createWithAuth(authKitInstance: AuthKitInstance) {
       // Get auth from locals (populated by the handle hook)
       const auth = event.locals.auth as AuthKitAuth;
 
-      // Check if user is authenticated
       if (!auth?.user) {
-        // Get the sign-in URL with return path
-        const signInUrl = await authKitInstance.getSignInUrl({
+        // Mint sign-in URL + verifier cookie together so the redirect
+        // SvelteKit emits for the thrown `redirect(302, url)` already
+        // carries the cookie that binds the OAuth `state`.
+        const { url, response, headers } = await authKitInstance.createSignIn(new Response(), {
           returnPathname: event.url.pathname,
         });
-
-        // Redirect to sign-in
-        throw redirect(302, signInUrl);
+        applyCookies(event, response, headers);
+        throw redirect(302, url);
       }
 
       // User is authenticated, call the handler with auth context

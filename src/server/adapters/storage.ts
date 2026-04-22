@@ -4,23 +4,27 @@ import type { AuthKitConfig as UpstreamConfig } from '@workos/authkit-session';
 import type { AuthKitConfig } from '../../types.js';
 
 /**
- * SvelteKit-specific session storage adapter for AuthKit
- * Extends CookieSessionStorage for Web API Request/Response objects
+ * Adds `getCookie(request, name)` to the base CookieSessionStorage so the
+ * library can read the PKCE verifier cookie via the same Web `Request`
+ * abstraction it uses for the session cookie — no AsyncLocalStorage detour.
  */
 export class SvelteKitStorage extends CookieSessionStorage<Request, Response> {
   constructor(config: AuthKitConfig) {
-    // CookieSessionStorage only uses cookie-related fields from config
     super(config as unknown as UpstreamConfig);
   }
 
-  /**
-   * Extract session data from request cookies
-   */
-  async getSession(request: Request): Promise<string | null> {
-    const cookieHeader = request.headers.get('cookie');
-    if (!cookieHeader) return null;
-
-    const cookies = parse(cookieHeader);
-    return cookies[this.cookieName] ?? null;
+  async getCookie(request: Request, name: string): Promise<string | null> {
+    const header = request.headers.get('cookie');
+    if (!header) return null;
+    const raw = parse(header)[name];
+    if (raw == null) return null;
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      // Malformed percent-encoding — surface as miss rather than 500 the
+      // request via an uncaught URIError. `cookie@1.x` does not decode by
+      // default, so we own the decode (and its failure mode).
+      return null;
+    }
   }
 }

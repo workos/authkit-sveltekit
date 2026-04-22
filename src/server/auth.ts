@@ -1,13 +1,23 @@
 import type { RequestEvent } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import type { createAuthService } from '@workos/authkit-session';
+import { OAuthStateMismatchError, PKCECookieMissingError, SessionEncryptionError } from '@workos/authkit-session';
 import type { SignInOptions, AuthKitAuth } from '../types.js';
+import { applyCookies, appendHeaderBag } from './adapters/cookie-forwarding.js';
+import { getRequestEvent } from './adapters/request-context.js';
 
 type AuthKitInstance = ReturnType<typeof createAuthService<Request, Response>>;
 
-/**
- * Create getUser helper
- */
+export const AuthErrorCode = {
+  AccessDenied: 'ACCESS_DENIED',
+  AuthError: 'AUTH_ERROR',
+  AuthFailed: 'AUTH_FAILED',
+  StateMismatch: 'STATE_MISMATCH',
+  PkceCookieMissing: 'PKCE_COOKIE_MISSING',
+  SessionEncryptionFailed: 'SESSION_ENCRYPTION_FAILED',
+} as const;
+export type AuthErrorCode = (typeof AuthErrorCode)[keyof typeof AuthErrorCode];
+
 export function createGetUser(_authKitInstance: AuthKitInstance) {
   return async (event: RequestEvent) => {
     const auth = event.locals.auth as AuthKitAuth;
@@ -15,48 +25,39 @@ export function createGetUser(_authKitInstance: AuthKitInstance) {
   };
 }
 
-/**
- * Create getSignInUrl helper
- */
+type CreateAuthUrlMethod = 'createSignIn' | 'createSignUp';
+
+function createGetAuthUrl(authKitInstance: AuthKitInstance, method: CreateAuthUrlMethod) {
+  return async (options?: SignInOptions): Promise<string> => {
+    const event = getRequestEvent();
+    const { url, response, headers } = await authKitInstance[method](new Response(), {
+      returnPathname: options?.returnTo,
+      organizationId: options?.organizationId,
+      loginHint: options?.loginHint,
+    });
+    applyCookies(event, response, headers);
+    return url;
+  };
+}
+
 export function createGetSignInUrl(authKitInstance: AuthKitInstance) {
-  return async (options?: SignInOptions) => {
-    return authKitInstance.getSignInUrl({
-      returnPathname: options?.returnTo,
-      organizationId: options?.organizationId,
-      loginHint: options?.loginHint,
-    });
-  };
+  return createGetAuthUrl(authKitInstance, 'createSignIn');
 }
 
-/**
- * Create getSignUpUrl helper
- */
 export function createGetSignUpUrl(authKitInstance: AuthKitInstance) {
-  return async (options?: SignInOptions) => {
-    return authKitInstance.getSignUpUrl({
-      returnPathname: options?.returnTo,
-      organizationId: options?.organizationId,
-      loginHint: options?.loginHint,
-    });
-  };
+  return createGetAuthUrl(authKitInstance, 'createSignUp');
 }
 
-/**
- * Create signOut helper
- */
 export function createSignOut(authKitInstance: AuthKitInstance) {
   return async (event: RequestEvent) => {
     const auth = event.locals.auth as AuthKitAuth;
 
     if (!auth?.sessionId) {
-      // No session to sign out from, just redirect home
       throw redirect(302, '/');
     }
 
-    // Use authkit-session's signOut method (returns logoutUrl and clear headers)
     const { logoutUrl, headers } = await authKitInstance.signOut(auth.sessionId);
 
-    // Create response with redirect to WorkOS logout URL
     const response = new Response(null, {
       status: 302,
       headers: {
@@ -64,37 +65,23 @@ export function createSignOut(authKitInstance: AuthKitInstance) {
       },
     });
 
-    // Apply session clear headers
-    if (headers) {
-      Object.entries(headers).forEach(([key, value]) => {
-        const headerValue = Array.isArray(value) ? value.join(', ') : value;
-        response.headers.set(key, headerValue);
-      });
-    }
+    appendHeaderBag(response.headers, headers);
 
     return response;
   };
 }
 
-/**
- * Create switchOrganization helper
- */
 export function createSwitchOrganization(authKitInstance: AuthKitInstance) {
   return async (event: RequestEvent, { organizationId }: { organizationId: string }) => {
-    // Get the current session
     const session = await authKitInstance.getSession(event.request);
 
     if (!session) {
       throw new Error('User must be authenticated to switch organizations');
     }
 
-    // Use authkit-session's switchOrganization method
     const { encryptedSession } = await authKitInstance.switchOrganization(session, organizationId);
-
-    // Save the new session and redirect
     const { headers } = await authKitInstance.saveSession(undefined, encryptedSession);
 
-    // Create response with redirect and session headers
     const response = new Response(null, {
       status: 302,
       headers: {
@@ -102,46 +89,59 @@ export function createSwitchOrganization(authKitInstance: AuthKitInstance) {
       },
     });
 
-    if (headers) {
-      Object.entries(headers).forEach(([key, value]) => {
-        const headerValue = Array.isArray(value) ? value.join(', ') : value;
-        response.headers.set(key, headerValue);
-      });
-    }
+    appendHeaderBag(response.headers, headers);
 
     return response;
   };
 }
 
 /**
- * Create handleCallback helper for OAuth callback
+ * Build an OAuth callback handler. The returned `Response` is constructed
+ * manually (not via SvelteKit's throwing `redirect()`) so the verifier-delete
+ * `Set-Cookie` attaches to this exact response — both on success and on every
+ * error bail path — preventing a stuck verifier from bleeding into the next
+ * sign-in attempt.
  */
 export function createHandleCallback(authKitInstance: AuthKitInstance) {
   return () => {
-    return async ({ url }: RequestEvent) => {
+    return async (event: RequestEvent): Promise<Response> => {
+      const { url, request } = event;
       const code = url.searchParams.get('code');
       const state = url.searchParams.get('state') || undefined;
-      const error = url.searchParams.get('error');
+      const oauthError = url.searchParams.get('error');
 
-      // Handle OAuth errors
-      if (error) {
-        console.error('OAuth error:', error);
-        const errorCode = error === 'access_denied' ? 'ACCESS_DENIED' : 'AUTH_ERROR';
-        throw redirect(302, `/auth/error?code=${errorCode}`);
+      const bail = async (errCode: AuthErrorCode): Promise<Response> => {
+        // No per-request `redirectUri` override in this adapter (the tanstack
+        // adapter's PR #66 needed one; we don't expose one), so the
+        // config-level redirectUri determines the verifier cookie's Path on
+        // both set and clear — they stay in sync automatically.
+        const { headers: deleteHeaders } = await authKitInstance.clearPendingVerifier(new Response());
+        const response = new Response(null, {
+          status: 302,
+          headers: { Location: `/auth/error?code=${errCode}` },
+        });
+        appendHeaderBag(response.headers, deleteHeaders);
+        return response;
+      };
+
+      if (oauthError) {
+        console.error('OAuth error:', oauthError);
+        return bail(oauthError === 'access_denied' ? AuthErrorCode.AccessDenied : AuthErrorCode.AuthError);
       }
 
       if (!code) {
-        throw new Error('Missing authorization code');
+        return bail(AuthErrorCode.AuthFailed);
       }
 
       try {
-        // Use authkit-session's handleCallback
-        const result = await authKitInstance.handleCallback(new Request(url.toString()), new Response(), {
+        const result = await authKitInstance.handleCallback(request, new Response(), {
           code,
           state,
         });
 
-        // Create response with redirect to the return path
+        // authkit-session guarantees returnPathname is a safe same-origin
+        // relative path (CWE-601 protection); emit verbatim so the Location
+        // stays relative and works behind proxies that don't reconstruct origin.
         const response = new Response(null, {
           status: 302,
           headers: {
@@ -149,36 +149,36 @@ export function createHandleCallback(authKitInstance: AuthKitInstance) {
           },
         });
 
-        // Apply session headers (may come from response object or headers bag)
+        // Only forward Set-Cookie from the response stub — authkit-session
+        // currently only writes cookies onto it, but iterating all headers
+        // would clobber our Location if that ever changes.
         if (result.response) {
-          result.response.headers.forEach((value: string, key: string) => {
-            response.headers.set(key, value);
-          });
+          for (const cookie of result.response.headers.getSetCookie()) {
+            response.headers.append('Set-Cookie', cookie);
+          }
         }
-        if (result.headers) {
-          Object.entries(result.headers).forEach(([key, value]) => {
-            const headerValue = Array.isArray(value) ? value.join(', ') : value;
-            response.headers.set(key, headerValue);
-          });
-        }
+        appendHeaderBag(response.headers, result.headers);
 
         return response;
       } catch (err) {
         console.error('Authentication error:', err);
-        throw redirect(302, '/auth/error?code=AUTH_FAILED');
+        const errCode =
+          err instanceof OAuthStateMismatchError
+            ? AuthErrorCode.StateMismatch
+            : err instanceof PKCECookieMissingError
+              ? AuthErrorCode.PkceCookieMissing
+              : err instanceof SessionEncryptionError
+                ? AuthErrorCode.SessionEncryptionFailed
+                : AuthErrorCode.AuthFailed;
+        return bail(errCode);
       }
     };
   };
 }
 
-/**
- * Create refreshSession helper
- * Note: Session refresh is handled automatically by authkit-session
- */
-export function createRefreshSession(authKitInstance: AuthKitInstance) {
-  return async (event: RequestEvent) => {
-    // Session refresh is handled automatically by withAuth
-    // This is a no-op but kept for API compatibility
+export function createRefreshSession(_authKitInstance: AuthKitInstance) {
+  return async (_event: RequestEvent) => {
+    // No-op: refresh is handled inside withAuth. Kept for public API compatibility.
     return true;
   };
 }
