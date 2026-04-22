@@ -1,7 +1,7 @@
 import type { Handle } from '@sveltejs/kit';
 import type { AuthKitHandleOptions, AuthKitAuth } from './types.js';
 import type { createAuthService, AuthResult } from '@workos/authkit-session';
-import { configureAuthKit } from './index.js';
+import { configureAuthKit } from './config.js';
 import { appendHeaderBag } from './server/adapters/cookie-forwarding.js';
 import { runWithRequestEvent } from './server/adapters/request-context.js';
 
