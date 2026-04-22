@@ -111,6 +111,10 @@ export function createHandleCallback(authKitInstance: AuthKitInstance) {
       const oauthError = url.searchParams.get('error');
 
       const bail = async (errCode: AuthErrorCode): Promise<Response> => {
+        // No per-request `redirectUri` override in this adapter (the tanstack
+        // adapter's PR #66 needed one; we don't expose one), so the
+        // config-level redirectUri determines the verifier cookie's Path on
+        // both set and clear — they stay in sync automatically.
         const { headers: deleteHeaders } = await authKitInstance.clearPendingVerifier(new Response());
         const response = new Response(null, {
           status: 302,
@@ -145,10 +149,13 @@ export function createHandleCallback(authKitInstance: AuthKitInstance) {
           },
         });
 
+        // Only forward Set-Cookie from the response stub — authkit-session
+        // currently only writes cookies onto it, but iterating all headers
+        // would clobber our Location if that ever changes.
         if (result.response) {
-          result.response.headers.forEach((value, key) => {
-            response.headers.append(key, value);
-          });
+          for (const cookie of result.response.headers.getSetCookie()) {
+            response.headers.append('Set-Cookie', cookie);
+          }
         }
         appendHeaderBag(response.headers, result.headers);
 
