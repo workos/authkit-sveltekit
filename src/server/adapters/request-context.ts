@@ -7,12 +7,16 @@ import type { RequestEvent } from '@sveltejs/kit';
  * current `RequestEvent` from here so the public API doesn't need to thread
  * it through every call site.
  *
- * We deliberately don't use `$app/server`'s `getRequestEvent` here: `$app/*`
- * is a SvelteKit-resolved virtual module that only exists inside the
- * consumer's Vite build. When this package is externalized for SSR (the
- * default), Node's native resolver tries to load `$app/server` and throws
- * `ERR_MODULE_NOT_FOUND`. A vendored `AsyncLocalStorage` has no such
- * constraint and publishes cleanly.
+ * We deliberately don't use `$app/server`'s `getRequestEvent` here because
+ * `$app/*` is a SvelteKit virtual module that only exists inside the
+ * consumer's build. When this package is externalized for SSR, leaving that
+ * import in the published output can fail module resolution before any auth
+ * code runs. Vendoring the request-context helper avoids that packaging issue.
+ *
+ * This is a slightly tighter runtime contract than SvelteKit's helper:
+ * SvelteKit dynamically loads `AsyncLocalStorage` and falls back to a
+ * synchronous store when ALS is unavailable, while this package requires ALS
+ * to exist when the module is evaluated.
  */
 const requestEventStore = new AsyncLocalStorage<RequestEvent>();
 
