@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Cookies, RequestEvent } from '@sveltejs/kit';
+import { getPKCECookieNameForState } from '@workos/authkit-session';
 import { createGetSignInUrl, createGetSignUpUrl } from '../server/auth.js';
 
 type AuthKitInstance = Parameters<typeof createGetSignInUrl>[0];
 
-const PKCE_COOKIE_NAME = 'wos-auth-verifier';
+const SEALED_VERIFIER = 'sealed-verifier';
+const EXPECTED_PKCE_COOKIE_NAME = getPKCECookieNameForState(SEALED_VERIFIER);
 
 const getRequestEventMock = vi.hoisted(() => vi.fn<() => RequestEvent>());
 
@@ -28,7 +30,7 @@ function mockCookies() {
 
 function makeInstance(
   method: 'createSignIn' | 'createSignUp',
-  setCookieValue = `${PKCE_COOKIE_NAME}=sealed-verifier; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600`,
+  setCookieValue = `${EXPECTED_PKCE_COOKIE_NAME}=${SEALED_VERIFIER}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600`,
 ): AuthKitInstance {
   return {
     [method]: vi.fn().mockResolvedValue({
@@ -61,8 +63,8 @@ describe('getSignInUrl / getSignUpUrl', () => {
     expect(url).toBe('https://workos.example/authorize?state=sealed');
     expect(setCalls).toHaveLength(1);
     expect(setCalls[0]).toMatchObject({
-      name: PKCE_COOKIE_NAME,
-      value: 'sealed-verifier',
+      name: EXPECTED_PKCE_COOKIE_NAME,
+      value: SEALED_VERIFIER,
       opts: {
         path: '/',
         httpOnly: true,
@@ -81,7 +83,7 @@ describe('getSignInUrl / getSignUpUrl', () => {
     await createGetSignUpUrl(instance)({ returnTo: '/welcome' });
 
     expect(setCalls).toHaveLength(1);
-    expect(setCalls[0].name).toBe(PKCE_COOKIE_NAME);
+    expect(setCalls[0].name).toBe(EXPECTED_PKCE_COOKIE_NAME);
   });
 
   it('propagates the error thrown by getRequestEvent outside a request context', async () => {
