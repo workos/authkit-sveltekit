@@ -97,10 +97,11 @@ export function createSwitchOrganization(authKitInstance: AuthKitInstance) {
 
 /**
  * Build an OAuth callback handler. The returned `Response` is constructed
- * manually (not via SvelteKit's throwing `redirect()`) so the verifier-delete
- * `Set-Cookie` attaches to this exact response — both on success and on every
- * error bail path — preventing a stuck verifier from bleeding into the next
- * sign-in attempt.
+ * manually (not via SvelteKit's throwing `redirect()`) so per-flow
+ * verifier-delete `Set-Cookie` headers attach to this exact response on
+ * success and on bail paths where URL `state` is present. Bails without
+ * `state` skip the delete — there is no deterministic cookie name to target
+ * — and rely on the 10-minute PKCE TTL to clean up orphans.
  */
 export function createHandleCallback(authKitInstance: AuthKitInstance) {
   return () => {
