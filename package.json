@@ -1,6 +1,6 @@
 {
   "name": "@workos/authkit-sveltekit",
-  "version": "0.3.0",
+  "version": "0.2.0",
   "description": "Official WorkOS AuthKit SDK for SvelteKit",
   "type": "module",
   "main": "./dist/index.cjs",
