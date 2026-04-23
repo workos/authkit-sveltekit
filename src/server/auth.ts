@@ -117,9 +117,6 @@ export function createHandleCallback(authKitInstance: AuthKitInstance) {
           headers: { Location: `/auth/error?code=${errCode}` },
         });
 
-        // Only clear when we know which flow's cookie to delete. URL state
-        // is the flow key; if it's absent (malformed callback), skip —
-        // the 10-minute PKCE TTL handles orphans.
         if (state) {
           const { headers: deleteHeaders } = await authKitInstance.clearPendingVerifier(new Response(), {
             state,

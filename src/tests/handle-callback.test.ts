@@ -13,9 +13,9 @@ type AuthKitInstance = Parameters<typeof createHandleCallback>[0];
 const TRUSTED_ORIGIN = 'https://trusted.example.com';
 const STATE = 'xyz';
 const CALLBACK_URL = `${TRUSTED_ORIGIN}/auth/callback?code=abc&state=${STATE}`;
-const EXPECTED_PKCE_COOKIE_NAME = getPKCECookieNameForState(STATE);
 
-const VERIFIER_DELETE = `${EXPECTED_PKCE_COOKIE_NAME}=; Path=/; Max-Age=0`;
+const verifierDeleteFor = (state: string) => `${getPKCECookieNameForState(state)}=; Path=/; Max-Age=0`;
+const VERIFIER_DELETE = verifierDeleteFor(STATE);
 const SESSION_COOKIE = 'wos-session=sealed-session; Path=/; HttpOnly; Secure; SameSite=Lax';
 
 function makeInstance(overrides: Partial<AuthKitInstance> = {}): AuthKitInstance {
@@ -152,112 +152,39 @@ describe('handleCallback', () => {
       expect(response.headers.getSetCookie()).toEqual([VERIFIER_DELETE]);
     });
 
-    it('missing ?code= with no state → AUTH_FAILED, no handleCallback, no Set-Cookie', async () => {
-      const instance = makeInstance();
-      const event = makeEvent(`${TRUSTED_ORIGIN}/auth/callback`);
-      const handler = createHandleCallback(instance)();
+    const URL_LEVEL_BAIL_CASES = [
+      { label: 'missing ?code=', query: '', code: 'AUTH_FAILED' },
+      { label: '?error=access_denied', query: '?error=access_denied', code: 'ACCESS_DENIED' },
+      { label: '?error=other', query: '?error=unexpected', code: 'AUTH_ERROR' },
+    ];
 
-      const response = await handler(event);
-
-      expect(response.headers.get('Location')).toBe('/auth/error?code=AUTH_FAILED');
-      expect(response.headers.getSetCookie()).toEqual([]);
-      expect(instance.handleCallback as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
-      expect(instance.clearPendingVerifier as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
-    });
-
-    it('?error=access_denied with no state → ACCESS_DENIED, no Set-Cookie', async () => {
-      const instance = makeInstance();
-      const event = makeEvent(`${TRUSTED_ORIGIN}/auth/callback?error=access_denied`);
-      const handler = createHandleCallback(instance)();
-
-      const response = await handler(event);
-
-      expect(response.headers.get('Location')).toBe('/auth/error?code=ACCESS_DENIED');
-      expect(response.headers.getSetCookie()).toEqual([]);
-      expect(instance.handleCallback as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
-      expect(instance.clearPendingVerifier as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
-    });
-
-    it('?error=anything-else with no state → AUTH_ERROR, no Set-Cookie', async () => {
-      const instance = makeInstance();
-      const event = makeEvent(`${TRUSTED_ORIGIN}/auth/callback?error=unexpected`);
-      const handler = createHandleCallback(instance)();
-
-      const response = await handler(event);
-
-      expect(response.headers.get('Location')).toBe('/auth/error?code=AUTH_ERROR');
-      expect(response.headers.getSetCookie()).toEqual([]);
-      expect(instance.clearPendingVerifier as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
-    });
-
-    it('missing ?code= with state present → AUTH_FAILED, per-flow verifier delete', async () => {
-      const sealedState = 'some-sealed-state-value';
-      const expectedName = getPKCECookieNameForState(sealedState);
-      const expectedDelete = `${expectedName}=; Path=/; Max-Age=0`;
-
-      const clearImpl = vi.fn().mockResolvedValue({
-        response: undefined,
-        headers: { 'Set-Cookie': expectedDelete },
+    describe.each(URL_LEVEL_BAIL_CASES)('$label', ({ query, code }) => {
+      it(`no state → ${code}, no Set-Cookie`, async () => {
+        const { response, instance } = await runCallback({
+          callbackUrl: `${TRUSTED_ORIGIN}/auth/callback${query}`,
+        });
+        expect(response.headers.get('Location')).toBe(`/auth/error?code=${code}`);
+        expect(response.headers.getSetCookie()).toEqual([]);
+        expect(instance.handleCallback as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
+        expect(instance.clearPendingVerifier as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
       });
-      const instance = makeInstance({ clearPendingVerifier: clearImpl } as Partial<AuthKitInstance>);
-      const event = makeEvent(`${TRUSTED_ORIGIN}/auth/callback?state=${encodeURIComponent(sealedState)}`);
-      const handler = createHandleCallback(instance)();
 
-      const response = await handler(event);
-
-      expect(response.headers.get('Location')).toBe('/auth/error?code=AUTH_FAILED');
-      expect(clearImpl).toHaveBeenCalledTimes(1);
-      expect(clearImpl.mock.calls[0][1]).toMatchObject({ state: sealedState });
-      const setCookies = response.headers.getSetCookie();
-      expect(setCookies.some((c) => c.startsWith(`${expectedName}=`) && c.includes('Max-Age=0'))).toBe(true);
-    });
-
-    it('?error=access_denied with state present → ACCESS_DENIED, per-flow verifier delete', async () => {
-      const sealedState = 'another-sealed-state';
-      const expectedName = getPKCECookieNameForState(sealedState);
-      const expectedDelete = `${expectedName}=; Path=/; Max-Age=0`;
-
-      const clearImpl = vi.fn().mockResolvedValue({
-        response: undefined,
-        headers: { 'Set-Cookie': expectedDelete },
+      it(`state present → ${code}, per-flow verifier delete`, async () => {
+        const sealedState = `sealed-${code}`;
+        const expectedDelete = verifierDeleteFor(sealedState);
+        const separator = query ? '&' : '?';
+        const { response, clearImpl } = await runCallback({
+          callbackUrl: `${TRUSTED_ORIGIN}/auth/callback${query}${separator}state=${sealedState}`,
+          clearImpl: vi.fn().mockResolvedValue({
+            response: undefined,
+            headers: { 'Set-Cookie': expectedDelete },
+          }),
+        });
+        expect(response.headers.get('Location')).toBe(`/auth/error?code=${code}`);
+        expect(clearImpl).toHaveBeenCalledTimes(1);
+        expect(clearImpl.mock.calls[0][1]).toMatchObject({ state: sealedState });
+        expect(response.headers.getSetCookie()).toEqual([expectedDelete]);
       });
-      const instance = makeInstance({ clearPendingVerifier: clearImpl } as Partial<AuthKitInstance>);
-      const event = makeEvent(
-        `${TRUSTED_ORIGIN}/auth/callback?error=access_denied&state=${encodeURIComponent(sealedState)}`,
-      );
-      const handler = createHandleCallback(instance)();
-
-      const response = await handler(event);
-
-      expect(response.headers.get('Location')).toBe('/auth/error?code=ACCESS_DENIED');
-      expect(clearImpl).toHaveBeenCalledTimes(1);
-      expect(clearImpl.mock.calls[0][1]).toMatchObject({ state: sealedState });
-      const setCookies = response.headers.getSetCookie();
-      expect(setCookies.some((c) => c.startsWith(`${expectedName}=`) && c.includes('Max-Age=0'))).toBe(true);
-    });
-
-    it('?error=anything-else with state present → AUTH_ERROR, per-flow verifier delete', async () => {
-      const sealedState = 'yet-another-state';
-      const expectedName = getPKCECookieNameForState(sealedState);
-      const expectedDelete = `${expectedName}=; Path=/; Max-Age=0`;
-
-      const clearImpl = vi.fn().mockResolvedValue({
-        response: undefined,
-        headers: { 'Set-Cookie': expectedDelete },
-      });
-      const instance = makeInstance({ clearPendingVerifier: clearImpl } as Partial<AuthKitInstance>);
-      const event = makeEvent(
-        `${TRUSTED_ORIGIN}/auth/callback?error=unexpected&state=${encodeURIComponent(sealedState)}`,
-      );
-      const handler = createHandleCallback(instance)();
-
-      const response = await handler(event);
-
-      expect(response.headers.get('Location')).toBe('/auth/error?code=AUTH_ERROR');
-      expect(clearImpl).toHaveBeenCalledTimes(1);
-      expect(clearImpl.mock.calls[0][1]).toMatchObject({ state: sealedState });
-      const setCookies = response.headers.getSetCookie();
-      expect(setCookies.some((c) => c.startsWith(`${expectedName}=`) && c.includes('Max-Age=0'))).toBe(true);
     });
   });
 });
