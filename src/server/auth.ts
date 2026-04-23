@@ -111,16 +111,21 @@ export function createHandleCallback(authKitInstance: AuthKitInstance) {
       const oauthError = url.searchParams.get('error');
 
       const bail = async (errCode: AuthErrorCode): Promise<Response> => {
-        // No per-request `redirectUri` override in this adapter (the tanstack
-        // adapter's PR #66 needed one; we don't expose one), so the
-        // config-level redirectUri determines the verifier cookie's Path on
-        // both set and clear — they stay in sync automatically.
-        const { headers: deleteHeaders } = await authKitInstance.clearPendingVerifier(new Response());
         const response = new Response(null, {
           status: 302,
           headers: { Location: `/auth/error?code=${errCode}` },
         });
-        appendHeaderBag(response.headers, deleteHeaders);
+
+        // Only clear when we know which flow's cookie to delete. URL state
+        // is the flow key; if it's absent (malformed callback), skip —
+        // the 10-minute PKCE TTL handles orphans.
+        if (state) {
+          const { headers: deleteHeaders } = await authKitInstance.clearPendingVerifier(new Response(), {
+            state,
+          });
+          appendHeaderBag(response.headers, deleteHeaders);
+        }
+
         return response;
       };
 
