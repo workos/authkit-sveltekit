@@ -12,7 +12,7 @@ importers:
   .:
     dependencies:
       '@workos/authkit-session':
-        specifier: ^0.5.1
+        specifier: ~0.5.1
         version: 0.5.1(typescript@5.9.3)
       cookie:
         specifier: '>=0.7.0'
