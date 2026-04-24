@@ -5,8 +5,9 @@ import { createGetSignInUrl, createGetSignUpUrl } from '../server/auth.js';
 
 type AuthKitInstance = Parameters<typeof createGetSignInUrl>[0];
 
+const SEALED_STATE = 'sealed';
 const SEALED_VERIFIER = 'sealed-verifier';
-const EXPECTED_PKCE_COOKIE_NAME = getPKCECookieNameForState(SEALED_VERIFIER);
+const EXPECTED_PKCE_COOKIE_NAME = getPKCECookieNameForState(SEALED_STATE);
 
 const getRequestEventMock = vi.hoisted(() => vi.fn<() => RequestEvent>());
 
