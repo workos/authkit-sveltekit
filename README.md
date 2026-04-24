@@ -136,6 +136,12 @@ export const load = authKit.withAuth(async ({ auth, ...event }) => {
 });
 ```
 
+> Apply `withAuth` only to routes that serve top-level HTML documents.
+> Using it on JSON API endpoints will set PKCE verifier cookies on XHR
+> responses that can't complete the OAuth flow, which (with per-flow cookie
+> naming in authkit-session 0.5.0) can accumulate into HTTP 431 under
+> concurrent load.
+
 #### `authKit.getUser(event)`
 
 Get the current user (nullable).

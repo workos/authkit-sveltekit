@@ -97,10 +97,11 @@ export function createSwitchOrganization(authKitInstance: AuthKitInstance) {
 
 /**
  * Build an OAuth callback handler. The returned `Response` is constructed
- * manually (not via SvelteKit's throwing `redirect()`) so the verifier-delete
- * `Set-Cookie` attaches to this exact response — both on success and on every
- * error bail path — preventing a stuck verifier from bleeding into the next
- * sign-in attempt.
+ * manually (not via SvelteKit's throwing `redirect()`) so per-flow
+ * verifier-delete `Set-Cookie` headers attach to this exact response on
+ * success and on bail paths where URL `state` is present. Bails without
+ * `state` skip the delete — there is no deterministic cookie name to target
+ * — and rely on the 10-minute PKCE TTL to clean up orphans.
  */
 export function createHandleCallback(authKitInstance: AuthKitInstance) {
   return () => {
@@ -111,16 +112,25 @@ export function createHandleCallback(authKitInstance: AuthKitInstance) {
       const oauthError = url.searchParams.get('error');
 
       const bail = async (errCode: AuthErrorCode): Promise<Response> => {
-        // No per-request `redirectUri` override in this adapter (the tanstack
-        // adapter's PR #66 needed one; we don't expose one), so the
-        // config-level redirectUri determines the verifier cookie's Path on
-        // both set and clear — they stay in sync automatically.
-        const { headers: deleteHeaders } = await authKitInstance.clearPendingVerifier(new Response());
         const response = new Response(null, {
           status: 302,
           headers: { Location: `/auth/error?code=${errCode}` },
         });
-        appendHeaderBag(response.headers, deleteHeaders);
+
+        if (state) {
+          // Storage-backed verifier clear can throw on non-cookie backends
+          // (e.g. Redis). Swallow and rely on the PKCE TTL — a failure here
+          // must not replace the caller's original error or drop the redirect.
+          try {
+            const { headers: deleteHeaders } = await authKitInstance.clearPendingVerifier(new Response(), {
+              state,
+            });
+            appendHeaderBag(response.headers, deleteHeaders);
+          } catch (clearErr) {
+            console.warn('Failed to clear PKCE verifier on bail; relying on TTL:', clearErr);
+          }
+        }
+
         return response;
       };
 

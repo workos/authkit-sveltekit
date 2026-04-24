@@ -1,15 +1,21 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { RequestEvent } from '@sveltejs/kit';
-import { OAuthStateMismatchError, PKCECookieMissingError, SessionEncryptionError } from '@workos/authkit-session';
+import {
+  getPKCECookieNameForState,
+  OAuthStateMismatchError,
+  PKCECookieMissingError,
+  SessionEncryptionError,
+} from '@workos/authkit-session';
 import { createHandleCallback } from '../server/auth.js';
 
 type AuthKitInstance = Parameters<typeof createHandleCallback>[0];
 
 const TRUSTED_ORIGIN = 'https://trusted.example.com';
-const CALLBACK_URL = `${TRUSTED_ORIGIN}/auth/callback?code=abc&state=xyz`;
-const PKCE_COOKIE_NAME = 'wos-auth-verifier';
+const STATE = 'xyz';
+const CALLBACK_URL = `${TRUSTED_ORIGIN}/auth/callback?code=abc&state=${STATE}`;
 
-const VERIFIER_DELETE = `${PKCE_COOKIE_NAME}=; Path=/; Max-Age=0`;
+const verifierDeleteFor = (state: string) => `${getPKCECookieNameForState(state)}=; Path=/; Max-Age=0`;
+const VERIFIER_DELETE = verifierDeleteFor(STATE);
 const SESSION_COOKIE = 'wos-session=sealed-session; Path=/; HttpOnly; Secure; SameSite=Lax';
 
 function makeInstance(overrides: Partial<AuthKitInstance> = {}): AuthKitInstance {
@@ -112,6 +118,17 @@ describe('handleCallback', () => {
   });
 
   describe('Bail paths clear the verifier', () => {
+    // Handler logs to console.error on bail paths (load-bearing for prod ops).
+    // Silence here so the suite stays readable; functional assertions below
+    // prove the bail path fired.
+    let errorSpy: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+    afterEach(() => {
+      errorSpy.mockRestore();
+    });
+
     it('state mismatch → Response with verifier-delete only', async () => {
       const { response, clearImpl } = await runCallback({
         handleCallbackImpl: vi.fn().mockRejectedValue(new OAuthStateMismatchError('mismatch')),
@@ -146,39 +163,64 @@ describe('handleCallback', () => {
       expect(response.headers.getSetCookie()).toEqual([VERIFIER_DELETE]);
     });
 
-    it('missing ?code= → AUTH_FAILED, no handleCallback call', async () => {
-      const instance = makeInstance();
-      const event = makeEvent(`${TRUSTED_ORIGIN}/auth/callback`);
-      const handler = createHandleCallback(instance)();
-
-      const response = await handler(event);
-
-      expect(response.headers.get('Location')).toBe('/auth/error?code=AUTH_FAILED');
-      expect(response.headers.getSetCookie()).toEqual([VERIFIER_DELETE]);
-      expect(instance.handleCallback as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
+    it('thrown handleCallback + no state → redirect without touching clearPendingVerifier', async () => {
+      const clearImpl = vi.fn();
+      const { response } = await runCallback({
+        callbackUrl: `${TRUSTED_ORIGIN}/auth/callback?code=abc`,
+        handleCallbackImpl: vi.fn().mockRejectedValue(new OAuthStateMismatchError('mismatch')),
+        clearImpl,
+      });
+      expect(response.headers.get('Location')).toBe('/auth/error?code=STATE_MISMATCH');
+      expect(response.headers.getSetCookie()).toEqual([]);
+      expect(clearImpl).not.toHaveBeenCalled();
     });
 
-    it('?error=access_denied → ACCESS_DENIED without handleCallback call', async () => {
-      const instance = makeInstance();
-      const event = makeEvent(`${TRUSTED_ORIGIN}/auth/callback?error=access_denied`);
-      const handler = createHandleCallback(instance)();
-
-      const response = await handler(event);
-
-      expect(response.headers.get('Location')).toBe('/auth/error?code=ACCESS_DENIED');
-      expect(response.headers.getSetCookie()).toEqual([VERIFIER_DELETE]);
-      expect(instance.handleCallback as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
+    it('clearPendingVerifier rejection does not swallow the redirect', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { response } = await runCallback({
+        handleCallbackImpl: vi.fn().mockRejectedValue(new OAuthStateMismatchError('mismatch')),
+        clearImpl: vi.fn().mockRejectedValue(new Error('storage offline')),
+      });
+      expect(response.status).toBe(302);
+      expect(response.headers.get('Location')).toBe('/auth/error?code=STATE_MISMATCH');
+      expect(response.headers.getSetCookie()).toEqual([]);
+      expect(warnSpy).toHaveBeenCalled();
+      warnSpy.mockRestore();
     });
 
-    it('?error=anything-else → AUTH_ERROR', async () => {
-      const instance = makeInstance();
-      const event = makeEvent(`${TRUSTED_ORIGIN}/auth/callback?error=unexpected`);
-      const handler = createHandleCallback(instance)();
+    const URL_LEVEL_BAIL_CASES = [
+      { label: 'missing ?code=', query: '', code: 'AUTH_FAILED' },
+      { label: '?error=access_denied', query: '?error=access_denied', code: 'ACCESS_DENIED' },
+      { label: '?error=other', query: '?error=unexpected', code: 'AUTH_ERROR' },
+    ];
 
-      const response = await handler(event);
+    describe.each(URL_LEVEL_BAIL_CASES)('$label', ({ query, code }) => {
+      it(`no state → ${code}, no Set-Cookie`, async () => {
+        const { response, instance } = await runCallback({
+          callbackUrl: `${TRUSTED_ORIGIN}/auth/callback${query}`,
+        });
+        expect(response.headers.get('Location')).toBe(`/auth/error?code=${code}`);
+        expect(response.headers.getSetCookie()).toEqual([]);
+        expect(instance.handleCallback as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
+        expect(instance.clearPendingVerifier as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
+      });
 
-      expect(response.headers.get('Location')).toBe('/auth/error?code=AUTH_ERROR');
-      expect(response.headers.getSetCookie()).toEqual([VERIFIER_DELETE]);
+      it(`state present → ${code}, per-flow verifier delete`, async () => {
+        const sealedState = `sealed-${code}`;
+        const expectedDelete = verifierDeleteFor(sealedState);
+        const separator = query ? '&' : '?';
+        const { response, clearImpl } = await runCallback({
+          callbackUrl: `${TRUSTED_ORIGIN}/auth/callback${query}${separator}state=${sealedState}`,
+          clearImpl: vi.fn().mockResolvedValue({
+            response: undefined,
+            headers: { 'Set-Cookie': expectedDelete },
+          }),
+        });
+        expect(response.headers.get('Location')).toBe(`/auth/error?code=${code}`);
+        expect(clearImpl).toHaveBeenCalledTimes(1);
+        expect(clearImpl.mock.calls[0][1]).toMatchObject({ state: sealedState });
+        expect(response.headers.getSetCookie()).toEqual([expectedDelete]);
+      });
     });
   });
 });
