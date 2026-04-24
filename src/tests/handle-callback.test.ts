@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { RequestEvent } from '@sveltejs/kit';
 import {
   getPKCECookieNameForState,
@@ -118,6 +118,17 @@ describe('handleCallback', () => {
   });
 
   describe('Bail paths clear the verifier', () => {
+    // Handler logs to console.error on bail paths (load-bearing for prod ops).
+    // Silence here so the suite stays readable; functional assertions below
+    // prove the bail path fired.
+    let errorSpy: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+    afterEach(() => {
+      errorSpy.mockRestore();
+    });
+
     it('state mismatch → Response with verifier-delete only', async () => {
       const { response, clearImpl } = await runCallback({
         handleCallbackImpl: vi.fn().mockRejectedValue(new OAuthStateMismatchError('mismatch')),
@@ -150,6 +161,31 @@ describe('handleCallback', () => {
       });
       expect(response.headers.get('Location')).toBe('/auth/error?code=AUTH_FAILED');
       expect(response.headers.getSetCookie()).toEqual([VERIFIER_DELETE]);
+    });
+
+    it('thrown handleCallback + no state → redirect without touching clearPendingVerifier', async () => {
+      const clearImpl = vi.fn();
+      const { response } = await runCallback({
+        callbackUrl: `${TRUSTED_ORIGIN}/auth/callback?code=abc`,
+        handleCallbackImpl: vi.fn().mockRejectedValue(new OAuthStateMismatchError('mismatch')),
+        clearImpl,
+      });
+      expect(response.headers.get('Location')).toBe('/auth/error?code=STATE_MISMATCH');
+      expect(response.headers.getSetCookie()).toEqual([]);
+      expect(clearImpl).not.toHaveBeenCalled();
+    });
+
+    it('clearPendingVerifier rejection does not swallow the redirect', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { response } = await runCallback({
+        handleCallbackImpl: vi.fn().mockRejectedValue(new OAuthStateMismatchError('mismatch')),
+        clearImpl: vi.fn().mockRejectedValue(new Error('storage offline')),
+      });
+      expect(response.status).toBe(302);
+      expect(response.headers.get('Location')).toBe('/auth/error?code=STATE_MISMATCH');
+      expect(response.headers.getSetCookie()).toEqual([]);
+      expect(warnSpy).toHaveBeenCalled();
+      warnSpy.mockRestore();
     });
 
     const URL_LEVEL_BAIL_CASES = [

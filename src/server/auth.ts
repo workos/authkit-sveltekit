@@ -118,10 +118,17 @@ export function createHandleCallback(authKitInstance: AuthKitInstance) {
         });
 
         if (state) {
-          const { headers: deleteHeaders } = await authKitInstance.clearPendingVerifier(new Response(), {
-            state,
-          });
-          appendHeaderBag(response.headers, deleteHeaders);
+          // Storage-backed verifier clear can throw on non-cookie backends
+          // (e.g. Redis). Swallow and rely on the PKCE TTL — a failure here
+          // must not replace the caller's original error or drop the redirect.
+          try {
+            const { headers: deleteHeaders } = await authKitInstance.clearPendingVerifier(new Response(), {
+              state,
+            });
+            appendHeaderBag(response.headers, deleteHeaders);
+          } catch (clearErr) {
+            console.warn('Failed to clear PKCE verifier on bail; relying on TTL:', clearErr);
+          }
         }
 
         return response;
