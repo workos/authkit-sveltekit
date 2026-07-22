@@ -20,11 +20,20 @@ const authHandle = authKitHandle({
 // Create a custom handle for protected routes
 const protectedRoutesHandle: Handle = async ({ event, resolve }) => {
   const protectedPaths = ['/account', '/api/'] as const;
-  const isProtectedRoute = protectedPaths.some((path) => event.url.pathname.startsWith(path));
+  // Guard on the resolved route id rather than the raw URL pathname.
+  // SvelteKit decodes the pathname before matching routes, so a check
+  // against event.url.pathname (which preserves percent-encoding) can be
+  // bypassed with an encoded path such as /%61ccount while the router still
+  // dispatches the protected /account route. event.route.id reflects the
+  // matched route and is immune to encoding tricks.
+  const routeId = event.route.id;
+  const isProtectedRoute =
+    routeId != null && protectedPaths.some((path) => routeId === path || routeId.startsWith(path));
+  const isApiRoute = routeId != null && routeId.startsWith('/api/');
 
   if (isProtectedRoute && !event.locals.auth?.user) {
     // API routes should return 401
-    if (event.url.pathname.startsWith('/api/')) {
+    if (isApiRoute) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
