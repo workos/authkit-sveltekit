@@ -36,17 +36,18 @@ jobs:
           token: ${{ secrets.PUBLIC_SOCKET_FIREWALL_TOKEN }}
       - name: Install Socket CLI
         run: npm install -g socket
-      # Restore the public npm registry after the CLI install and before the
-      # scan. The scan uploads manifests to Socket and performs no further
-      # dependency downloads.
-      - name: Restore public package registry
-        uses: workos/setup-socket-firewall/teardown@ca93dd8aa351f54f4729fe3377a9be23c631c25d # v1
       - name: Run Tier 1 reachability scan
         env:
           SOCKET_SECURITY_API_TOKEN: ${{ secrets.SOCKET_API_KEY }}
         run: |
-          # Full application reachability (Tier 1)
+          # Full application reachability (Tier 1). Keep Socket Firewall active
+          # because --reach can install missing project dependencies.
           socket scan create . \
             --reach \
             --org "workos" \
             --no-interactive
+      # Restore the public npm registry after the reachability scan. The scan
+      # can install missing project dependencies, so SFW stays active through it.
+      - name: Restore public package registry
+        if: ${{ always() }}
+        uses: workos/setup-socket-firewall/teardown@ca93dd8aa351f54f4729fe3377a9be23c631c25d # v1
