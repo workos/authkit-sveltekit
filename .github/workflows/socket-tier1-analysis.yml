@@ -27,14 +27,27 @@ jobs:
           echo "distinct_id: ${{ github.event.inputs.distinct_id }}"
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      # Socket Firewall screens the Socket CLI download below. This scheduled
+      # job installs the CLI from the public npm registry, so SFW is configured
+      # before that download.
+      - name: Configure Socket Firewall
+        uses: workos/setup-socket-firewall@ca93dd8aa351f54f4729fe3377a9be23c631c25d # v1
+        with:
+          token: ${{ secrets.PUBLIC_SOCKET_FIREWALL_TOKEN }}
       - name: Install Socket CLI
         run: npm install -g socket
       - name: Run Tier 1 reachability scan
         env:
           SOCKET_SECURITY_API_TOKEN: ${{ secrets.SOCKET_API_KEY }}
         run: |
-          # Full application reachability (Tier 1)
+          # Full application reachability (Tier 1). Keep Socket Firewall active
+          # because --reach can install missing project dependencies.
           socket scan create . \
             --reach \
             --org "workos" \
             --no-interactive
+      # Restore the public npm registry after the reachability scan. The scan
+      # can install missing project dependencies, so SFW stays active through it.
+      - name: Restore public package registry
+        if: ${{ always() }}
+        uses: workos/setup-socket-firewall/teardown@ca93dd8aa351f54f4729fe3377a9be23c631c25d # v1

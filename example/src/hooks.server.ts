@@ -18,7 +18,7 @@ const authHandle = authKitHandle({
 });
 
 // Create a custom handle for protected routes
-const protectedRoutesHandle: Handle = async ({ event, resolve }) => {
+export const protectedRoutesHandle: Handle = async ({ event, resolve }) => {
   const protectedPaths = ['/account', '/api/'] as const;
   // Guard on the resolved route id rather than the raw URL pathname.
   // SvelteKit decodes the pathname before matching routes, so a check
