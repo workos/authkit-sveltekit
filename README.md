@@ -83,9 +83,9 @@ export const GET: RequestHandler = async (event) => {
 };
 ```
 
-### 5. Create Sign-in Endpoint
+### 5. Create Initiate Login URI
 
-Create a route that initiates the AuthKit sign-in flow. This route is used as the **Sign-in endpoint** (also known as `initiate_login_uri`) in your WorkOS dashboard settings.
+Create a route that initiates the AuthKit sign-in flow. This route is used as the **Initiate login URI** (`initiate_login_uri`) for your application in the WorkOS dashboard.
 
 Create `src/routes/sign-in/+server.ts`:
 
@@ -100,9 +100,9 @@ export const GET: RequestHandler = async () => {
 };
 ```
 
-In the [WorkOS dashboard **Redirects** settings](https://dashboard.workos.com/redirects), set the **Sign-in endpoint** to match this route (e.g., `http://localhost:5173/sign-in`).
+In the [WorkOS dashboard](https://dashboard.workos.com), open **Applications**, select your application, go to the **Redirects** tab, and set the **Initiate login URI** to match this route (e.g., `http://localhost:5173/sign-in`).
 
-> **Important**: The sign-in endpoint is required for features like [impersonation](https://workos.com/docs/user-management/impersonation) to work correctly. Without it, WorkOS-initiated flows (such as impersonating a user from the dashboard) will fail because they cannot complete the PKCE/CSRF verification this library enforces on every callback.
+> **Important**: The Initiate login URI is required for features like [impersonation](https://workos.com/docs/user-management/impersonation) to work correctly. Without it, WorkOS-initiated flows (such as impersonating a user from the dashboard) will fail because they cannot complete the PKCE/CSRF verification this library enforces on every callback.
 
 ### 6. Protect Routes
 
@@ -365,7 +365,7 @@ Please add them to your .env file. See https://github.com/workos/authkit-sveltek
 
 This error occurs when WorkOS-initiated flows (like dashboard impersonation) redirect directly to your callback URL without going through your application's sign-in flow. Because this library enforces PKCE/CSRF verification on every callback, the request is rejected when the required `state` parameter is missing.
 
-**Fix:** Configure a [sign-in endpoint](#5-create-sign-in-endpoint) in your WorkOS dashboard so that impersonation flows route through your app first, allowing PKCE/state to be set up before redirecting to WorkOS.
+**Fix:** Configure an [Initiate login URI](#5-create-initiate-login-uri) in your WorkOS dashboard so that impersonation flows route through your app first, allowing PKCE/state to be set up before redirecting to WorkOS.
 
 ## License
 
