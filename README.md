@@ -100,7 +100,7 @@ export const GET: RequestHandler = async () => {
 };
 ```
 
-In the [WorkOS dashboard](https://dashboard.workos.com/redirects), open your application's **Redirects** tab and set the **Initiate login URI** to match this route (e.g., `http://localhost:5173/sign-in`).
+In the [WorkOS dashboard](https://dashboard.workos.com), open **Applications**, select your application, go to the **Redirects** tab, and set the **Initiate login URI** to match this route (e.g., `http://localhost:5173/sign-in`).
 
 > **Important**: The Initiate login URI is required for features like [impersonation](https://workos.com/docs/user-management/impersonation) to work correctly. Without it, WorkOS-initiated flows (such as impersonating a user from the dashboard) will fail because they cannot complete the PKCE/CSRF verification this library enforces on every callback.
 
