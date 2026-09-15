@@ -55,7 +55,6 @@ jobs:
         run: |
           pnpm run build
 
-      # NOTE: uncomment when we have tests
-      # - name: Test
-      #   run: |
-      #     pnpm run test -- --coverage
+      - name: Test
+        run: |
+          pnpm run test -- --run --coverage
