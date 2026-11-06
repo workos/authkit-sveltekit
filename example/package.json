@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@sveltejs/adapter-auto": "^6.0.0",
-    "@sveltejs/kit": "^2.50.2",
+    "@sveltejs/kit": "^3.0.0",
     "@workos/authkit-sveltekit": "workspace:*",
     "svelte": "^5.0.0"
   },
